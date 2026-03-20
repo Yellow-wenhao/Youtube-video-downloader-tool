@@ -2,10 +2,7 @@
 
 ## 2026-03-18
 
-- 脚本泛化：`--vehicle-phrase` 指定车型匹配短语（默认仍为 perodua myvi），换车型时改关键词文件 + 该参数即可。
 - 新增 `--year-from` / `--year-to`：按上传年份筛选（依赖元数据 upload_date）。
-- 新增 `--lang-rules en|my|both`：介绍意图词分英文 / 马来补充 / 合并。
-- 入选 CSV 扩展字段：video_id、channel_id、upload_year、正负向与实车线索命中摘要、标签/描述摘要等。
 - 新增 `--full-csv`：写出 `04_all_scored.csv`（全部候选打分，便于数据集清洗）。
 - 增加 `requirements.txt`；README 补充流程与参数说明。
 - GUI 增强：增加任务队列（加入/启动/删除/清空）、目录历史、参数预设保存/加载/删除、日志右键菜单。
