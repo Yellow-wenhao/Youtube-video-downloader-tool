@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.venv/
+venv/
+myvi_dataset/
+myvi_downloads/
+test_dataset/
+test_downloads/
+*_dataset/
+*_downloads/
