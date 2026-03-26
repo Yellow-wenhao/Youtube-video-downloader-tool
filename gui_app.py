@@ -1707,10 +1707,13 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 with report.open("r", encoding="utf-8-sig", newline="") as fh:
                     for row in csv.DictReader(fh):
+                        # 兼容新旧下载报告字段：
+                        # 旧版使用 status(downloaded/failed)，新版使用 视频是否下载成功(是/否)。
                         st = (row.get("status") or "").strip().lower()
-                        if st == "downloaded":
+                        success_flag = (row.get("视频是否下载成功") or "").strip()
+                        if success_flag == "是" or st == "downloaded":
                             downloaded += 1
-                        elif st == "failed":
+                        elif success_flag == "否" or st == "failed":
                             failed += 1
                         else:
                             unknown += 1

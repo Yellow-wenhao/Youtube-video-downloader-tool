@@ -860,16 +860,31 @@ def write_download_report_csv(
     failed_urls: Sequence[str],
     failed_reason_map: Optional[Dict[str, str]] = None,
 ) -> Path:
+    def _format_upload_date_yyyy_mm_dd(raw: Any) -> str:
+        s = normalize_text(raw)
+        if not s:
+            return ""
+        # yt-dlp 常见格式为 YYYYMMDD，统一转为 YYYY-MM-DD。
+        if len(s) == 8 and s.isdigit():
+            return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+        # 已经是 YYYY-MM-DD 时直接返回。
+        if len(s) == 10 and s[4] == "-" and s[7] == "-":
+            yyyy, mm, dd = s[:4], s[5:7], s[8:10]
+            if yyyy.isdigit() and mm.isdigit() and dd.isdigit():
+                return s
+        # 兜底保留原始值，避免丢信息。
+        return s
+
     out_csv = session_dir / "07_download_report.csv"
     failed_set = {u.strip() for u in failed_urls if u and u.strip()}
     failed_reason_map = failed_reason_map or {}
     failed_set.update({u.strip() for u in failed_reason_map.keys() if u and u.strip()})
     fields = [
-        "video_id",
-        "title",
-        "watch_url",
-        "失败原因",
-        "上传时间",
+        "视频id",
+        "视频原标题",
+        "视频在YouTube上传的时间",
+        "视频url",
+        "视频是否下载成功",
     ]
     # 用 UTF-8 BOM，兼容 Windows Excel 直接打开时的中文显示。
     with out_csv.open("w", encoding="utf-8-sig", newline="") as fh:
@@ -880,14 +895,14 @@ def write_download_report_csv(
                 continue
             url = normalize_text(it.get("watch_url"))
             vid = normalize_text(it.get("video_id")) or extract_video_id(url)
-            failure_reason = failed_reason_map.get(url, "") if url in failed_set else ""
+            is_success = "否" if url in failed_set else "是"
             writer.writerow(
                 {
-                    "video_id": vid,
-                    "title": normalize_text(it.get("title")),
-                    "watch_url": url,
-                    "失败原因": failure_reason,
-                    "上传时间": normalize_text(it.get("upload_date")),
+                    "视频id": vid,
+                    "视频原标题": normalize_text(it.get("title")),
+                    "视频在YouTube上传的时间": _format_upload_date_yyyy_mm_dd(it.get("upload_date")),
+                    "视频url": url,
+                    "视频是否下载成功": is_success,
                 }
             )
     return out_csv
