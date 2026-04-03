@@ -402,13 +402,16 @@ class MainWindow(QtWidgets.QMainWindow):
         body_row.addWidget(tabs, 1)
 
         tab_config = QtWidgets.QWidget()
+        tab_config.setObjectName("configTabPage")
         tab_config_outer = QtWidgets.QVBoxLayout(tab_config)
         tab_config_outer.setContentsMargins(8, 8, 8, 8)
         cfg_scroll = QtWidgets.QScrollArea()
+        cfg_scroll.setObjectName("configScroll")
         cfg_scroll.setWidgetResizable(True)
         cfg_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         tab_config_outer.addWidget(cfg_scroll)
         cfg_content = QtWidgets.QWidget()
+        cfg_content.setObjectName("configScrollContent")
         cfg_scroll.setWidget(cfg_content)
         tab_config_layout = QtWidgets.QVBoxLayout(cfg_content)
         tab_config_layout.setContentsMargins(4, 4, 4, 8)
@@ -638,11 +641,13 @@ class MainWindow(QtWidgets.QMainWindow):
         row_cfg_top.setSpacing(10)
         row_cfg_top.addWidget(box_filter, 1)
         row_cfg_top.addWidget(box_download, 1)
+        self.cfg_row_top = row_cfg_top
         tab_config_layout.addLayout(row_cfg_top)
         row_cfg_bottom = QtWidgets.QHBoxLayout()
         row_cfg_bottom.setSpacing(10)
         row_cfg_bottom.addWidget(box_queue, 1)
         row_cfg_bottom.addWidget(maint_box, 1)
+        self.cfg_row_bottom = row_cfg_bottom
         tab_config_layout.addLayout(row_cfg_bottom)
         self.combo_download_mode.currentTextChanged.connect(self._on_download_mode_changed)
         self._on_download_mode_changed(self.combo_download_mode.currentText())
@@ -850,6 +855,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.refresh_downloaded_view()
 
         self._normalize_ui_sizes()
+        self._adjust_config_layout_for_width()
         self.status = self.statusBar()
 
     def _tune_form_labels(self, form: QtWidgets.QFormLayout, label_width: int) -> None:
@@ -889,16 +895,17 @@ class MainWindow(QtWidgets.QMainWindow):
             self.spin_concurrent_fragments,
         ]
 
+        # 降低最小宽度，避免在 1080p 下双栏布局被挤压。
         for w in line_edits:
-            w.setMinimumWidth(460)
+            w.setMinimumWidth(260)
             w.setMinimumHeight(34)
         for w in combos_wide:
-            w.setMinimumWidth(240)
+            w.setMinimumWidth(180)
             w.setMinimumHeight(34)
         for w in spins:
-            w.setMinimumWidth(150)
+            w.setMinimumWidth(110)
             w.setMinimumHeight(34)
-            w.setMaximumWidth(220)
+            w.setMaximumWidth(180)
 
         for b in self.findChildren(QtWidgets.QPushButton):
             b.setMinimumHeight(34)
@@ -917,6 +924,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_more_ops.setMinimumHeight(34)
         self.btn_more_ops.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.btn_more_ops.setMinimumWidth(96)
+
+    def _adjust_config_layout_for_width(self) -> None:
+        width = self.width()
+        direction = (
+            QtWidgets.QBoxLayout.LeftToRight if width >= 1650 else QtWidgets.QBoxLayout.TopToBottom
+        )
+        for lay in [getattr(self, "cfg_row_top", None), getattr(self, "cfg_row_bottom", None)]:
+            if isinstance(lay, QtWidgets.QBoxLayout):
+                lay.setDirection(direction)
 
     def _wrap(self, inner_layout: QtWidgets.QLayout) -> QtWidgets.QWidget:
         w = QtWidgets.QWidget()
@@ -2869,6 +2885,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # type: ignore[override]
         super().resizeEvent(event)
+        self._adjust_config_layout_for_width()
         if self._toast.isVisible():
             self._toast._reposition_to_parent_corner()
 

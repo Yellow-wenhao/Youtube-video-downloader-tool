@@ -177,6 +177,16 @@ def build_main_stylesheet() -> str:
         border: none;
         background: transparent;
     }}
+    QWidget#configTabPage, QWidget#configScrollContent {{
+        background: transparent;
+    }}
+    QScrollArea#configScroll {{
+        border: none;
+        background: transparent;
+    }}
+    QScrollArea#configScroll > QWidget > QWidget {{
+        background: transparent;
+    }}
     QListWidget#sideNav {{
         border: 1px solid {t["border_default"]};
         border-radius: 10px;
