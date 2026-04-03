@@ -16,9 +16,10 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
+import ui_theme
 
 
 SETTINGS_FILE = Path(__file__).with_name("gui_settings.json")
@@ -155,6 +156,97 @@ class NoWheelComboBox(QtWidgets.QComboBox):
         event.ignore()
 
 
+class DownloadToast(QtWidgets.QFrame):
+    def __init__(self, parent: QtWidgets.QWidget) -> None:
+        super().__init__(parent)
+        self._action: Optional[Callable[[], None]] = None
+        self.setObjectName("downloadToast")
+        self.setWindowFlags(
+            QtCore.Qt.ToolTip | QtCore.Qt.FramelessWindowHint | QtCore.Qt.WindowStaysOnTopHint
+        )
+        self.setAttribute(QtCore.Qt.WA_ShowWithoutActivating, True)
+        self.setStyleSheet(
+            """
+            QFrame#downloadToast {
+                background: #1F1F1F;
+                border: 1px solid #3A3A3A;
+                border-radius: 12px;
+            }
+            QLabel#toastTitle {
+                color: #F1F1F1;
+                font-weight: 700;
+                font-size: 13px;
+            }
+            QLabel#toastDetail {
+                color: #B8B8B8;
+                font-size: 12px;
+            }
+            QPushButton#toastAction {
+                background: #FF3B30;
+                color: #FFFFFF;
+                border: 1px solid #D73027;
+                border-radius: 8px;
+                padding: 4px 10px;
+                font-weight: 600;
+            }
+            QPushButton#toastAction:hover {
+                background: #E3372D;
+            }
+            """
+        )
+        lay = QtWidgets.QVBoxLayout(self)
+        lay.setContentsMargins(12, 10, 12, 10)
+        lay.setSpacing(6)
+        self.lbl_title = QtWidgets.QLabel("")
+        self.lbl_title.setObjectName("toastTitle")
+        self.lbl_detail = QtWidgets.QLabel("")
+        self.lbl_detail.setObjectName("toastDetail")
+        self.btn_action = QtWidgets.QPushButton("")
+        self.btn_action.setObjectName("toastAction")
+        self.btn_action.clicked.connect(self._on_action_clicked)
+        lay.addWidget(self.lbl_title)
+        lay.addWidget(self.lbl_detail)
+        lay.addWidget(self.btn_action, 0, QtCore.Qt.AlignRight)
+        self.timer = QtCore.QTimer(self)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.hide)
+
+    def show_toast(
+        self,
+        title: str,
+        detail: str = "",
+        action_text: str = "",
+        action: Optional[Callable[[], None]] = None,
+        duration_ms: int = 4500,
+    ) -> None:
+        self._action = action
+        self.lbl_title.setText(title.strip() or "任务通知")
+        self.lbl_detail.setText(detail.strip())
+        has_action = bool(action_text.strip() and action is not None)
+        self.btn_action.setVisible(has_action)
+        if has_action:
+            self.btn_action.setText(action_text.strip())
+        self.adjustSize()
+        self._reposition_to_parent_corner()
+        self.show()
+        self.raise_()
+        self.timer.start(max(1200, int(duration_ms or 4500)))
+
+    def _on_action_clicked(self) -> None:
+        self.hide()
+        if self._action is not None:
+            self._action()
+
+    def _reposition_to_parent_corner(self) -> None:
+        p = self.parentWidget()
+        if p is None:
+            return
+        margin = 18
+        x = max(margin, p.width() - self.width() - margin)
+        y = max(margin, p.height() - self.height() - margin - 28)
+        self.move(x, y)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     thumb_ready = QtCore.Signal(str, bytes)
 
@@ -184,6 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.active_run_kind: str = "adhoc"  # adhoc | filter_queue | download_queue
         self.download_all_mode: bool = False
         self.user_stopped = False
+        self.pause_requested = False
         self._log_line_buffer = ""
         self._stage_step = 0
         self._active_has_download = False
@@ -207,6 +300,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._thumb_lazy_timer.setInterval(120)
         self._thumb_lazy_timer.timeout.connect(self._load_visible_thumbs)
         self.thumb_ready.connect(self._on_thumb_ready)
+        self._toast = DownloadToast(self)
+        self._last_download_output_dir = ""
+        self.downloaded_records: list[dict] = []
 
         self._init_ui()
         self._apply_ui_theme()
@@ -215,162 +311,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(1200, self._check_tools_after_maint)
 
     def _apply_ui_theme(self) -> None:
-        self.setStyleSheet(
-            """
-            QWidget {
-                font-family: "Source Han Sans SC", "Microsoft YaHei UI", "PingFang SC";
-                font-size: 13px;
-                color: #1f2a3d;
-            }
-            QMainWindow, QWidget#root {
-                background: #edf2f8;
-            }
-            QGroupBox {
-                border: 1px solid #d9e2f0;
-                border-radius: 14px;
-                margin-top: 14px;
-                padding-top: 14px;
-                padding-left: 10px;
-                padding-right: 10px;
-                padding-bottom: 10px;
-                background: #ffffff;
-                font-weight: 600;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 8px 0 8px;
-                color: #173f78;
-                background: #edf2f8;
-                border-radius: 6px;
-            }
-            QGroupBox#mini {
-                margin-top: 10px;
-                border-radius: 10px;
-                padding-top: 10px;
-                background: #f8fbff;
-            }
-            QGroupBox#mini::title {
-                color: #47648d;
-                font-size: 12px;
-            }
-            QTabWidget::pane {
-                border: 1px solid #d9e2f0;
-                border-radius: 14px;
-                background: #ffffff;
-                top: -1px;
-            }
-            QTabBar::tab {
-                background: #e7eef8;
-                border: 1px solid #d2dcec;
-                border-bottom: none;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-                padding: 9px 18px;
-                margin-right: 6px;
-                color: #2c4c82;
-            }
-            QTabBar::tab:selected {
-                background: #fdfefe;
-                color: #123b75;
-                font-weight: 600;
-            }
-            QTabBar::tab:hover:!selected {
-                background: #dfe8f6;
-            }
-            QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTableView, QListWidget {
-                border: 1px solid #c8d4e8;
-                border-radius: 9px;
-                padding: 7px 9px;
-                background: #ffffff;
-                selection-background-color: #c8ddff;
-            }
-            QSplitter::handle {
-                background: #e1e9f5;
-                border-radius: 3px;
-            }
-            QSplitter::handle:horizontal {
-                width: 6px;
-            }
-            QSplitter::handle:horizontal:hover {
-                background: #c7d7ef;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus {
-                border: 1px solid #4f83d1;
-            }
-            QPushButton, QToolButton {
-                border: 1px solid #bfcee7;
-                border-radius: 9px;
-                padding: 8px 13px;
-                background: #f4f7fc;
-                color: #27436f;
-            }
-            QPushButton:hover, QToolButton:hover {
-                background: #eaf1fc;
-            }
-            QPushButton#primary {
-                background: #1f66d1;
-                color: #ffffff;
-                border: 1px solid #1a57af;
-                font-weight: 600;
-            }
-            QPushButton#primary:hover {
-                background: #1758b2;
-            }
-            QPushButton#secondary, QToolButton#secondary {
-                background: #f5f8fd;
-                color: #2e4f82;
-                border: 1px solid #c8d7ee;
-                font-weight: 500;
-            }
-            QPushButton#secondary:hover, QToolButton#secondary:hover {
-                background: #eaf1fc;
-            }
-            QPushButton#danger {
-                background: #bf3a3a;
-                color: #ffffff;
-                border: 1px solid #a53434;
-                font-weight: 600;
-            }
-            QPushButton#danger:hover {
-                background: #a53434;
-            }
-            QProgressBar {
-                border: 1px solid #c8d4e8;
-                border-radius: 7px;
-                text-align: center;
-                background: #f3f6fb;
-                min-height: 14px;
-            }
-            QProgressBar::chunk {
-                border-radius: 6px;
-                background-color: #1f66d1;
-            }
-            QHeaderView::section {
-                background: #e8eef8;
-                border: 0px;
-                border-right: 1px solid #d2dcec;
-                border-bottom: 1px solid #d2dcec;
-                padding: 6px 8px;
-                color: #27436f;
-                font-weight: 600;
-            }
-            QTableView {
-                gridline-color: #e1e8f3;
-            }
-            QStatusBar {
-                background: #e8eef8;
-                border-top: 1px solid #d2dcec;
-            }
-            QLabel#hint {
-                color: #60789c;
-            }
-            QListWidget#videoFeed {
-                border: none;
-                background: transparent;
-            }
-            """
-        )
+        self.setStyleSheet(ui_theme.build_main_stylesheet())
 
     def _init_ui(self) -> None:
         w = QtWidgets.QWidget()
@@ -382,13 +323,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         title_row = QtWidgets.QHBoxLayout()
         title = QtWidgets.QLabel("YouTube 视频下载工具")
-        title.setStyleSheet("font-size:24px; font-weight:700; color:#123c76; letter-spacing:0.3px;")
+        title.setObjectName("appTitle")
         title_row.addWidget(title)
         title_row.addStretch()
         self.lbl_progress_status = QtWidgets.QLabel("就绪")
-        self.lbl_progress_status.setStyleSheet(
-            "font-size:12px; font-weight:600; color:#21508f; background:#e8f0ff; border:1px solid #c8d9f2; padding:4px 10px; border-radius:12px;"
-        )
+        self.lbl_progress_status.setObjectName("statusBadge")
         self.lbl_progress_status.setMaximumWidth(520)
         title_row.addWidget(self.lbl_progress_status, 0, QtCore.Qt.AlignVCenter)
         layout.addLayout(title_row)
@@ -437,19 +376,42 @@ class MainWindow(QtWidgets.QMainWindow):
         progress_layout.addWidget(self.box_active_tasks)
         layout.addWidget(progress_box)
 
+        body_row = QtWidgets.QHBoxLayout()
+        body_row.setSpacing(10)
+        layout.addLayout(body_row, 1)
+
+        nav_box = QtWidgets.QGroupBox("导航")
+        nav_box.setObjectName("mini")
+        nav_box.setMaximumWidth(210)
+        nav_layout = QtWidgets.QVBoxLayout(nav_box)
+        nav_layout.setContentsMargins(8, 8, 8, 8)
+        nav_layout.setSpacing(8)
+        self.side_nav = QtWidgets.QListWidget()
+        self.side_nav.setObjectName("sideNav")
+        self.side_nav.setFrameShape(QtWidgets.QFrame.NoFrame)
+        self.side_nav.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.side_nav.addItems(["任务配置", "队列执行", "日志结果", "已下载"])
+        self.side_nav.currentRowChanged.connect(self._on_side_nav_changed)
+        nav_layout.addWidget(self.side_nav)
+        body_row.addWidget(nav_box, 0)
+
         tabs = QtWidgets.QTabWidget()
         tabs.setDocumentMode(True)
+        tabs.tabBar().hide()
         self.tabs = tabs
-        layout.addWidget(tabs, 1)
+        body_row.addWidget(tabs, 1)
 
         tab_config = QtWidgets.QWidget()
+        tab_config.setObjectName("configTabPage")
         tab_config_outer = QtWidgets.QVBoxLayout(tab_config)
         tab_config_outer.setContentsMargins(8, 8, 8, 8)
         cfg_scroll = QtWidgets.QScrollArea()
+        cfg_scroll.setObjectName("configScroll")
         cfg_scroll.setWidgetResizable(True)
         cfg_scroll.setFrameShape(QtWidgets.QFrame.NoFrame)
         tab_config_outer.addWidget(cfg_scroll)
         cfg_content = QtWidgets.QWidget()
+        cfg_content.setObjectName("configScrollContent")
         cfg_scroll.setWidget(cfg_content)
         tab_config_layout = QtWidgets.QVBoxLayout(cfg_content)
         tab_config_layout.setContentsMargins(4, 4, 4, 8)
@@ -656,11 +618,11 @@ class MainWindow(QtWidgets.QMainWindow):
         maint_box = QtWidgets.QGroupBox("工具维护 (yt-dlp / ffmpeg)")
         maint_layout = QtWidgets.QGridLayout(maint_box)
         self.lbl_tools_summary = QtWidgets.QLabel("状态: 未检查")
-        self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#555;")
+        self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("neutral"))
         self.lbl_ytdlp_ver = QtWidgets.QLabel("yt-dlp 当前: - | 最新: - | 更新状态: 未检查")
         self.lbl_ffmpeg_ver = QtWidgets.QLabel("ffmpeg 当前: - | 最新: - | 更新状态: 未检查")
         self.lbl_tools_checked_at = QtWidgets.QLabel("最后检查: -")
-        self.lbl_tools_checked_at.setStyleSheet("color:#666;")
+        self.lbl_tools_checked_at.setStyleSheet(ui_theme.muted_text_style())
         self.btn_check_tools = QtWidgets.QPushButton("检查版本")
         self.btn_check_tools.clicked.connect(self.on_check_tools)
         self.btn_update_ytdlp = QtWidgets.QPushButton("更新 yt-dlp")
@@ -679,11 +641,13 @@ class MainWindow(QtWidgets.QMainWindow):
         row_cfg_top.setSpacing(10)
         row_cfg_top.addWidget(box_filter, 1)
         row_cfg_top.addWidget(box_download, 1)
+        self.cfg_row_top = row_cfg_top
         tab_config_layout.addLayout(row_cfg_top)
         row_cfg_bottom = QtWidgets.QHBoxLayout()
         row_cfg_bottom.setSpacing(10)
         row_cfg_bottom.addWidget(box_queue, 1)
         row_cfg_bottom.addWidget(maint_box, 1)
+        self.cfg_row_bottom = row_cfg_bottom
         tab_config_layout.addLayout(row_cfg_bottom)
         self.combo_download_mode.currentTextChanged.connect(self._on_download_mode_changed)
         self._on_download_mode_changed(self.combo_download_mode.currentText())
@@ -703,7 +667,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout = QtWidgets.QVBoxLayout(left_box)
         left_layout.setSpacing(8)
         self.lbl_queue_stats = QtWidgets.QLabel("队列任务: 0")
-        self.lbl_queue_stats.setStyleSheet("font-size:14px; font-weight:600; color:#153a72;")
+        self.lbl_queue_stats.setObjectName("sectionTitle")
         self.lbl_queue_focus = QtWidgets.QLabel("当前选中: 无")
         self.lbl_queue_focus.setObjectName("hint")
         self.lbl_queue_focus.setWordWrap(True)
@@ -717,6 +681,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_download_selected = QtWidgets.QPushButton("下载选中任务")
         self.btn_download_selected.setObjectName("primary")
         self.btn_download_selected.clicked.connect(self.download_selected_task)
+
+        self.btn_pause = QtWidgets.QPushButton("暂停当前任务")
+        self.btn_pause.setObjectName("secondary")
+        self.btn_pause.clicked.connect(self.pause_current_task)
+
+        self.btn_resume = QtWidgets.QPushButton("继续选中任务")
+        self.btn_resume.setObjectName("secondary")
+        self.btn_resume.clicked.connect(self.resume_selected_task)
 
         self.btn_stop = QtWidgets.QPushButton("停止当前任务")
         self.btn_stop.setObjectName("danger")
@@ -733,6 +705,12 @@ class MainWindow(QtWidgets.QMainWindow):
         act_resume.triggered.connect(self.resume_last_download_task)
         act_retry_failed = menu_more.addAction("重试失败URL(当前任务)")
         act_retry_failed.triggered.connect(self.retry_failed_urls_for_selected_task)
+        act_retry_failed_tasks = menu_more.addAction("重试选中失败任务")
+        act_retry_failed_tasks.triggered.connect(self.retry_selected_failed_tasks)
+        act_promote = menu_more.addAction("选中任务置顶")
+        act_promote.triggered.connect(self.promote_selected_tasks)
+        act_open_task_dir = menu_more.addAction("打开选中任务目录")
+        act_open_task_dir.triggered.connect(self.open_selected_task_workdir)
         menu_more.addSeparator()
         act_remove = menu_more.addAction("删除选中任务")
         act_remove.triggered.connect(self.remove_selected_tasks)
@@ -747,6 +725,11 @@ class MainWindow(QtWidgets.QMainWindow):
         ops_layout.setSpacing(8)
         ops_layout.addWidget(self.btn_start_queue)
         ops_layout.addWidget(self.btn_download_selected)
+        row_pause = QtWidgets.QHBoxLayout()
+        row_pause.setSpacing(8)
+        row_pause.addWidget(self.btn_pause, 1)
+        row_pause.addWidget(self.btn_resume, 1)
+        ops_layout.addLayout(row_pause)
         row_ctrl = QtWidgets.QHBoxLayout()
         row_ctrl.setSpacing(8)
         row_ctrl.addWidget(self.btn_stop, 1)
@@ -757,6 +740,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.queue_list = QtWidgets.QListWidget()
         self.queue_list.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
         self.queue_list.currentRowChanged.connect(self._update_queue_focus_summary)
+        self.queue_list.itemDoubleClicked.connect(self._on_queue_item_double_clicked)
         left_layout.addWidget(self.queue_list, 1)
 
         right_box = QtWidgets.QGroupBox("视频列表")
@@ -837,9 +821,41 @@ class MainWindow(QtWidgets.QMainWindow):
         tab_output_layout.addWidget(self.te_log, 1)
         self.model = CsvPreviewModel(self)
         tabs.addTab(tab_output, "3. 日志结果")
+
+        tab_downloaded = QtWidgets.QWidget()
+        tab_downloaded_layout = QtWidgets.QVBoxLayout(tab_downloaded)
+        tab_downloaded_layout.setContentsMargins(0, 0, 0, 0)
+        tab_downloaded_layout.setSpacing(8)
+        row_dl_ops = QtWidgets.QHBoxLayout()
+        self.btn_refresh_downloaded = QtWidgets.QPushButton("刷新已下载")
+        self.btn_refresh_downloaded.setObjectName("secondary")
+        self.btn_refresh_downloaded.clicked.connect(self.refresh_downloaded_view)
+        self.btn_open_downloaded_dir = QtWidgets.QPushButton("打开目录")
+        self.btn_open_downloaded_dir.setObjectName("secondary")
+        self.btn_open_downloaded_dir.clicked.connect(self.open_selected_downloaded_dir)
+        self.btn_open_downloaded_report = QtWidgets.QPushButton("打开报告 CSV")
+        self.btn_open_downloaded_report.setObjectName("secondary")
+        self.btn_open_downloaded_report.clicked.connect(self.open_selected_downloaded_report)
+        row_dl_ops.addWidget(self.btn_refresh_downloaded)
+        row_dl_ops.addWidget(self.btn_open_downloaded_dir)
+        row_dl_ops.addWidget(self.btn_open_downloaded_report)
+        row_dl_ops.addStretch()
+        tab_downloaded_layout.addLayout(row_dl_ops)
+        self.downloaded_list = QtWidgets.QListWidget()
+        self.downloaded_list.currentRowChanged.connect(self._update_downloaded_detail)
+        tab_downloaded_layout.addWidget(self.downloaded_list, 1)
+        self.lbl_downloaded_detail = QtWidgets.QLabel("暂无下载记录")
+        self.lbl_downloaded_detail.setObjectName("hint")
+        self.lbl_downloaded_detail.setWordWrap(True)
+        tab_downloaded_layout.addWidget(self.lbl_downloaded_detail)
+        tabs.addTab(tab_downloaded, "4. 已下载")
+
         tabs.currentChanged.connect(self._on_main_tab_changed)
+        self.side_nav.setCurrentRow(0)
+        self.refresh_downloaded_view()
 
         self._normalize_ui_sizes()
+        self._adjust_config_layout_for_width()
         self.status = self.statusBar()
 
     def _tune_form_labels(self, form: QtWidgets.QFormLayout, label_width: int) -> None:
@@ -879,16 +895,17 @@ class MainWindow(QtWidgets.QMainWindow):
             self.spin_concurrent_fragments,
         ]
 
+        # 降低最小宽度，避免在 1080p 下双栏布局被挤压。
         for w in line_edits:
-            w.setMinimumWidth(460)
+            w.setMinimumWidth(260)
             w.setMinimumHeight(34)
         for w in combos_wide:
-            w.setMinimumWidth(240)
+            w.setMinimumWidth(180)
             w.setMinimumHeight(34)
         for w in spins:
-            w.setMinimumWidth(150)
+            w.setMinimumWidth(110)
             w.setMinimumHeight(34)
-            w.setMaximumWidth(220)
+            w.setMaximumWidth(180)
 
         for b in self.findChildren(QtWidgets.QPushButton):
             b.setMinimumHeight(34)
@@ -898,6 +915,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for b in [
             self.btn_start_queue,
             self.btn_download_selected,
+            self.btn_pause,
+            self.btn_resume,
             self.btn_stop,
         ]:
             b.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -905,6 +924,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_more_ops.setMinimumHeight(34)
         self.btn_more_ops.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         self.btn_more_ops.setMinimumWidth(96)
+
+    def _adjust_config_layout_for_width(self) -> None:
+        width = self.width()
+        direction = (
+            QtWidgets.QBoxLayout.LeftToRight if width >= 1650 else QtWidgets.QBoxLayout.TopToBottom
+        )
+        for lay in [getattr(self, "cfg_row_top", None), getattr(self, "cfg_row_bottom", None)]:
+            if isinstance(lay, QtWidgets.QBoxLayout):
+                lay.setDirection(direction)
 
     def _wrap(self, inner_layout: QtWidgets.QLayout) -> QtWidgets.QWidget:
         w = QtWidgets.QWidget()
@@ -966,6 +994,33 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             QtCore.QProcess.startDetached("xdg-open", [str(p)])
 
+    def _show_toast(
+        self,
+        title: str,
+        detail: str = "",
+        action_text: str = "",
+        action: Optional[Callable[[], None]] = None,
+        duration_ms: int = 4500,
+    ) -> None:
+        self._toast.show_toast(
+            title=title,
+            detail=detail,
+            action_text=action_text,
+            action=action,
+            duration_ms=duration_ms,
+        )
+
+    def _open_last_download_output_dir(self) -> None:
+        if self._last_download_output_dir:
+            self._open_dir(self._last_download_output_dir)
+
+    @QtCore.Slot(int)
+    def _on_side_nav_changed(self, row: int) -> None:
+        if row < 0 or row >= self.tabs.count():
+            return
+        if self.tabs.currentIndex() != row:
+            self.tabs.setCurrentIndex(row)
+
     def show_log_context_menu(self, pos: QtCore.QPoint) -> None:
         menu = QtWidgets.QMenu(self)
         act_copy = menu.addAction("复制")
@@ -1022,7 +1077,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if not self.cfg.python_exe:
             self.lbl_tools_summary.setText("状态: 未找到系统 Python，无法检查/更新 yt-dlp")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
             self.lbl_ytdlp_ver.setText("yt-dlp 当前: 未知 | 最新: 未知 | 更新状态: 需安装 Python")
             self.lbl_ffmpeg_ver.setText("ffmpeg 当前: 未检查 | 最新: 未检查 | 更新状态: 未检查")
             self.lbl_tools_checked_at.setText(
@@ -1032,7 +1087,7 @@ class MainWindow(QtWidgets.QMainWindow):
         script = self._build_tool_check_script()
         self._tool_check_output = ""
         self.lbl_tools_summary.setText("状态: 正在后台检查版本...")
-        self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#47648d;")
+        self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("info"))
         self.tool_check_proc.setWorkingDirectory(str(Path(__file__).parent))
         self.tool_check_proc.start(self.cfg.python_exe, ["-c", script])
 
@@ -1180,19 +1235,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if (y_ok and not y_need) and (f_ok and not f_need):
             self.lbl_tools_summary.setText("状态: 两个工具均可用且已是最新")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#1b5e20;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("success"))
         elif y_ok and f_ok and (y_need or f_need):
             self.lbl_tools_summary.setText("状态: 工具可用，但存在可更新版本")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         elif y_ok and not f_ok:
             self.lbl_tools_summary.setText("状态: yt-dlp 可用，ffmpeg 缺失/异常")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         elif (not y_ok) and f_ok:
             self.lbl_tools_summary.setText("状态: ffmpeg 可用，yt-dlp 异常")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         else:
             self.lbl_tools_summary.setText("状态: yt-dlp 与 ffmpeg 均异常或缺失")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b00020;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("danger"))
 
     def on_check_tools(self) -> None:
         self.append_log("\n[维护] 检查版本...\n")
@@ -1327,13 +1382,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 old_w["card"].deleteLater()
             self._reflow_active_cards()
         card = QtWidgets.QFrame()
-        card.setStyleSheet("QFrame{background:#ffffff;border:1px solid #d6deea;border-radius:8px;}")
+        card.setStyleSheet(ui_theme.active_task_card_style())
         v = QtWidgets.QVBoxLayout(card)
         v.setContentsMargins(8, 6, 8, 6)
         v.setSpacing(4)
         lbl_title = QtWidgets.QLabel((label or f"id={key}")[:42])
         lbl_title.setToolTip(label or f"id={key}")
-        lbl_title.setStyleSheet("font-size:12px;font-weight:600;color:#173a71;")
+        lbl_title.setStyleSheet(ui_theme.active_task_title_style())
         bar = QtWidgets.QProgressBar()
         bar.setRange(0, 100)
         bar.setValue(0)
@@ -1890,11 +1945,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @QtCore.Slot(int)
     def _on_main_tab_changed(self, idx: int) -> None:
-        # 仅在“队列执行”页启用缩略图加载，避免启动阶段占用网络/CPU
-        tab_text = self.tabs.tabText(idx) if hasattr(self, "tabs") else ""
-        self._thumb_lazy_enabled = tab_text.startswith("2.")
+        # 仅在“队列执行”页启用缩略图加载，避免启动阶段占用网络/CPU。
+        self._thumb_lazy_enabled = idx == 1
         if self._thumb_lazy_enabled:
             self._schedule_visible_thumb_load()
+        if hasattr(self, "side_nav") and self.side_nav.currentRow() != idx:
+            blocker = QtCore.QSignalBlocker(self.side_nav)
+            self.side_nav.setCurrentRow(idx)
 
     def _schedule_visible_thumb_load(self) -> None:
         if not self._thumb_lazy_enabled:
@@ -1921,9 +1978,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if video_id in self._thumb_cache:
             return self._thumb_cache[video_id]
         pm = QtGui.QPixmap(176, 99)
-        pm.fill(QtGui.QColor("#dfe7f4"))
+        pm.fill(QtGui.QColor("#212121"))
         painter = QtGui.QPainter(pm)
-        painter.setPen(QtGui.QColor("#5f7697"))
+        painter.setPen(QtGui.QColor("#AAAAAA"))
         painter.drawText(pm.rect(), QtCore.Qt.AlignCenter, "加载中")
         painter.end()
         return pm
@@ -2053,7 +2110,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _make_video_card(self, idx: int, row: dict) -> QtWidgets.QWidget:
         card = QtWidgets.QFrame()
         card.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        card.setStyleSheet("QFrame{background:#ffffff;border:1px solid #d8e2f0;border-radius:12px;}")
+        card.setStyleSheet(ui_theme.video_card_style())
         card.setProperty("video_id", row.get("video_id", ""))
         h = QtWidgets.QHBoxLayout(card)
         h.setContentsMargins(10, 10, 10, 10)
@@ -2070,16 +2127,16 @@ class MainWindow(QtWidgets.QMainWindow):
         v = QtWidgets.QVBoxLayout()
         v.setSpacing(5)
         title = QtWidgets.QLabel(row.get("title", "(无标题)"))
-        title.setStyleSheet("font-size:15px; font-weight:600; color:#102f5d;")
+        title.setStyleSheet(ui_theme.video_title_style())
         title.setWordWrap(True)
         title.setMaximumHeight(44)
         meta = QtWidgets.QLabel(
             f"作者 {row.get('channel', '-')}  ·  上传 {row.get('upload_date', '-')}  ·  时长 {self._format_duration(str(row.get('duration', '-')))}"
         )
-        meta.setStyleSheet("color:#657f9f; font-size:12px;")
+        meta.setStyleSheet(ui_theme.video_meta_style())
         url = QtWidgets.QLabel(row.get("watch_url", ""))
         url.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        url.setStyleSheet("color:#456a97; font-size:12px;")
+        url.setStyleSheet(ui_theme.video_url_style())
         v.addWidget(title)
         v.addWidget(meta)
         v.addWidget(url)
@@ -2132,6 +2189,214 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.video_page < pages:
             self.video_page += 1
             self._render_video_page()
+
+    def _selected_queue_rows(self) -> list[int]:
+        rows = sorted({idx.row() for idx in self.queue_list.selectedIndexes()})
+        return [r for r in rows if 0 <= r < len(self.task_queue)]
+
+    def _selected_downloaded_record(self) -> Optional[dict]:
+        row = self.downloaded_list.currentRow() if hasattr(self, "downloaded_list") else -1
+        if row < 0 or row >= len(self.downloaded_records):
+            return None
+        return self.downloaded_records[row]
+
+    def _collect_downloaded_records(self) -> list[dict]:
+        records: list[dict] = []
+        for task in self.task_queue:
+            if task.status not in {"downloaded", "download_failed", "downloading", "paused_download"} and task.selected_count <= 0:
+                continue
+            ok_n, fail_n, unk_n, session_path, report_path = self._read_download_summary(Path(task.workdir))
+            out_dir = session_path.strip() if session_path.strip() else task.download_dir
+            records.append(
+                {
+                    "task_name": task.vehicle,
+                    "status": task.status,
+                    "ok": ok_n,
+                    "fail": fail_n,
+                    "unknown": unk_n,
+                    "dir": out_dir,
+                    "report": report_path,
+                    "run_id": task.run_id,
+                }
+            )
+        records.sort(key=lambda r: str(r.get("run_id", "")), reverse=True)
+        return records
+
+    def refresh_downloaded_view(self) -> None:
+        self.downloaded_records = self._collect_downloaded_records()
+        self.downloaded_list.clear()
+        if not self.downloaded_records:
+            self.lbl_downloaded_detail.setText("暂无下载记录")
+            return
+        status_label = {
+            "downloaded": "已完成",
+            "download_failed": "失败",
+            "downloading": "下载中",
+            "paused_download": "已暂停",
+        }
+        for rec in self.downloaded_records:
+            st = status_label.get(str(rec.get("status", "")), str(rec.get("status", "")))
+            text = (
+                f"[{st}] {rec.get('task_name', '-')[:28]} | 成功 {rec.get('ok', 0)} "
+                f"失败 {rec.get('fail', 0)} 其他 {rec.get('unknown', 0)}"
+            )
+            item = QtWidgets.QListWidgetItem(text)
+            self.downloaded_list.addItem(item)
+        self.downloaded_list.setCurrentRow(0)
+
+    def _update_downloaded_detail(self, row: int) -> None:
+        if row < 0 or row >= len(self.downloaded_records):
+            self.lbl_downloaded_detail.setText("暂无下载记录")
+            return
+        rec = self.downloaded_records[row]
+        self.lbl_downloaded_detail.setText(
+            f"任务: {rec.get('task_name', '-')}\n"
+            f"状态: {rec.get('status', '-')}\n"
+            f"成功: {rec.get('ok', 0)} | 失败: {rec.get('fail', 0)} | 其他: {rec.get('unknown', 0)}\n"
+            f"目录: {rec.get('dir', '-')}\n"
+            f"报告: {rec.get('report', '-')}"
+        )
+
+    def open_selected_downloaded_dir(self) -> None:
+        rec = self._selected_downloaded_record()
+        if rec is None:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一条下载记录。")
+            return
+        self._open_dir(str(rec.get("dir", "")))
+
+    def open_selected_downloaded_report(self) -> None:
+        rec = self._selected_downloaded_record()
+        if rec is None:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一条下载记录。")
+            return
+        report = Path(str(rec.get("report", "")))
+        if not report.exists():
+            QtWidgets.QMessageBox.information(self, "提示", f"报告不存在: {report}")
+            return
+        if sys.platform.startswith("win"):
+            os.startfile(str(report))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            QtCore.QProcess.startDetached("open", [str(report)])
+        else:
+            QtCore.QProcess.startDetached("xdg-open", [str(report)])
+
+    def pause_current_task(self) -> None:
+        if self.runner.proc.state() == QtCore.QProcess.NotRunning:
+            QtWidgets.QMessageBox.information(self, "提示", "当前没有正在运行的任务。")
+            return
+        self.pause_requested = True
+        self.user_stopped = False
+        self.download_all_mode = False
+        self.lbl_progress_status.setText("正在暂停任务...")
+        self.runner.kill()
+
+    def resume_selected_task(self) -> None:
+        if self.runner.proc.state() != QtCore.QProcess.NotRunning:
+            QtWidgets.QMessageBox.warning(self, "正在运行", "请先等待当前任务结束。")
+            return
+        rows = self._selected_queue_rows()
+        if not rows:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一个任务。")
+            return
+        row = rows[0]
+        task = self.task_queue[row]
+        if task.status == "paused_filter":
+            self.active_queue_index = row
+            self.active_run_kind = "filter_queue"
+            task.status = "running"
+            self._refresh_queue_list()
+            self._start_process(task.args, task.workdir)
+            return
+        if task.status == "paused_download":
+            self._start_download_for_row(row)
+            return
+        QtWidgets.QMessageBox.information(self, "提示", "选中任务不是可继续状态。")
+
+    def _on_queue_item_double_clicked(self, _item: QtWidgets.QListWidgetItem) -> None:
+        self.load_selected_task_videos()
+        if self.tabs.currentIndex() != 1:
+            self.tabs.setCurrentIndex(1)
+
+    def _start_download_for_row(self, row: int) -> None:
+        if row < 0 or row >= len(self.task_queue):
+            return
+        task = self.task_queue[row]
+        self.active_queue_index = row
+        self.active_run_kind = "download_queue"
+        self.download_all_mode = False
+        task.status = "downloading"
+        self._refresh_queue_list()
+        self._start_process(self._download_args_for_task(task), task.workdir)
+
+    def open_selected_task_workdir(self) -> None:
+        rows = self._selected_queue_rows()
+        if not rows:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一个任务。")
+            return
+        task = self.task_queue[rows[0]]
+        self._open_dir(task.workdir)
+
+    def promote_selected_tasks(self) -> None:
+        rows = self._selected_queue_rows()
+        if not rows:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择要置顶的任务。")
+            return
+        running_task = None
+        if self.active_queue_index is not None and 0 <= self.active_queue_index < len(self.task_queue):
+            running_task = self.task_queue[self.active_queue_index]
+        selected_set = set(rows)
+        selected_tasks = [self.task_queue[i] for i in rows]
+        others = [t for i, t in enumerate(self.task_queue) if i not in selected_set]
+        self.task_queue = selected_tasks + others
+        if running_task is not None:
+            try:
+                self.active_queue_index = self.task_queue.index(running_task)
+            except ValueError:
+                self.active_queue_index = None
+        self._refresh_queue_list()
+        self.queue_list.clearSelection()
+        for i in range(len(selected_tasks)):
+            item = self.queue_list.item(i)
+            if item is not None:
+                item.setSelected(True)
+        self.status.showMessage(f"已将 {len(selected_tasks)} 个任务置顶。", 4000)
+
+    def retry_selected_failed_tasks(self) -> None:
+        if self.runner.proc.state() != QtCore.QProcess.NotRunning:
+            QtWidgets.QMessageBox.warning(self, "正在运行", "请先等待当前任务结束。")
+            return
+        rows = self._selected_queue_rows()
+        if not rows:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一个或多个任务。")
+            return
+        retry_filter = 0
+        retry_download = 0
+        first_download_row: Optional[int] = None
+        for row in rows:
+            task = self.task_queue[row]
+            if task.status in {"failed", "stopped"}:
+                task.status = "pending"
+                retry_filter += 1
+                continue
+            if task.status == "download_failed":
+                if task.selected_count > 0:
+                    task.status = "ready_download"
+                    retry_download += 1
+                    if first_download_row is None:
+                        first_download_row = row
+                else:
+                    task.status = "filtered_empty"
+        if retry_filter == 0 and retry_download == 0:
+            QtWidgets.QMessageBox.information(self, "提示", "选中任务中没有可重试的失败项。")
+            return
+        self._refresh_queue_list()
+        if retry_filter > 0:
+            self.status.showMessage(f"已重试筛选任务 {retry_filter} 个。", 5000)
+            self.start_queue()
+            return
+        if first_download_row is not None:
+            self.status.showMessage(f"已重试下载任务 {retry_download} 个。", 5000)
+            self._start_download_for_row(first_download_row)
 
     def retry_failed_urls_for_selected_task(self) -> None:
         task = self._current_task()
@@ -2262,23 +2527,16 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.runner.proc.state() != QtCore.QProcess.NotRunning:
             QtWidgets.QMessageBox.warning(self, "正在运行", "请先等待当前任务结束。")
             return
-        rows = sorted({idx.row() for idx in self.queue_list.selectedIndexes()})
+        rows = self._selected_queue_rows()
         if not rows:
             QtWidgets.QMessageBox.information(self, "提示", "请先在队列中选中一个任务。")
             return
         row = rows[0]
-        if row < 0 or row >= len(self.task_queue):
-            return
         task = self.task_queue[row]
         if task.status not in {"ready_download", "download_failed", "downloaded"} and task.selected_count <= 0:
             QtWidgets.QMessageBox.information(self, "提示", "该任务尚未筛选出可下载 URL，请先执行筛选。")
             return
-        self.active_queue_index = row
-        self.active_run_kind = "download_queue"
-        self.download_all_mode = False
-        task.status = "downloading"
-        self._refresh_queue_list()
-        self._start_process(self._download_args_for_task(task), task.workdir)
+        self._start_download_for_row(row)
 
     def download_all_ready_tasks(self) -> None:
         if self.runner.proc.state() != QtCore.QProcess.NotRunning:
@@ -2324,6 +2582,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
         self.user_stopped = False
+        self.pause_requested = False
         self._log_line_buffer = ""
         self._stage_step = 0
         self._active_has_download = ("--download" in args) or ("--download-from-urls-file" in args)
@@ -2374,9 +2633,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def on_stop_clicked(self) -> None:
         self.user_stopped = True
+        self.pause_requested = False
         self.download_all_mode = False
         self.lbl_progress_status.setText("正在停止任务...")
         self.runner.kill()
+
+    def _queue_item_color(self, status: str) -> QtGui.QColor:
+        s = (status or "").strip()
+        if s in {"running", "downloading"}:
+            return QtGui.QColor(ui_theme.TOKENS["state_info"])
+        if s in {"paused_filter", "paused_download"}:
+            return QtGui.QColor(ui_theme.TOKENS["state_warning"])
+        if s in {"failed", "download_failed"}:
+            return QtGui.QColor(ui_theme.TOKENS["state_error"])
+        if s in {"done", "ready_download", "downloaded", "filtered_empty"}:
+            return QtGui.QColor(ui_theme.TOKENS["state_success"])
+        return QtGui.QColor(ui_theme.TOKENS["text_secondary"])
 
     def _refresh_queue_list(self) -> None:
         self.queue_list.clear()
@@ -2386,9 +2658,11 @@ class MainWindow(QtWidgets.QMainWindow):
             prefix = {
                 "pending": "待运行",
                 "running": "运行中",
+                "paused_filter": "已暂停·筛选",
                 "ready_download": "已筛选·待下载",
                 "filtered_empty": "已筛选·无结果",
                 "downloading": "下载中",
+                "paused_download": "已暂停·下载",
                 "downloaded": "下载完成",
                 "download_failed": "下载失败",
                 "done": "已完成",
@@ -2397,7 +2671,7 @@ class MainWindow(QtWidgets.QMainWindow):
             }.get(task.status, task.status)
             if task.status == "pending":
                 pending_count += 1
-            if task.status in {"ready_download", "download_failed", "downloaded"}:
+            if task.status in {"ready_download", "download_failed", "downloaded", "paused_download"}:
                 ready_count += 1
             short_query = (task.vehicle or "").strip() or "未命名查询"
             if len(short_query) > 24:
@@ -2408,12 +2682,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 f"状态: {prefix}\n查询: {task.vehicle}\nrun_id: {task.run_id}\n模式: {task.download_mode}\n"
                 f"可下载URL: {task.selected_count}\n信息目录: {task.workdir}"
             )
-            if task.status in {"running", "downloading"}:
-                item.setForeground(QtGui.QColor("#005a9c"))
-            elif task.status in {"failed", "download_failed"}:
-                item.setForeground(QtGui.QColor("#b00020"))
-            elif task.status in {"done", "ready_download", "downloaded", "filtered_empty"}:
-                item.setForeground(QtGui.QColor("#2e7d32"))
+            item.setForeground(self._queue_item_color(task.status))
             self.queue_list.addItem(item)
         self.lbl_queue_stats.setText(
             f"队列任务: {len(self.task_queue)} | 待筛选: {pending_count} | 可下载任务: {ready_count}"
@@ -2441,7 +2710,14 @@ class MainWindow(QtWidgets.QMainWindow):
             task = self.task_queue[self.active_queue_index]
             finished_task = task
             task.exit_code = code
-            if self.user_stopped:
+            if self.pause_requested:
+                if self.active_run_kind == "filter_queue":
+                    task.status = "paused_filter"
+                elif self.active_run_kind == "download_queue":
+                    task.status = "paused_download"
+                else:
+                    task.status = "stopped"
+            elif self.user_stopped:
                 task.status = "stopped"
             else:
                 if self.active_run_kind == "filter_queue":
@@ -2468,7 +2744,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     task.status = "done" if code == 0 else "failed"
 
-        if code == 0:
+        if self.pause_requested:
+            self.lbl_progress_status.setText("任务已暂停")
+            self.status.showMessage("任务已暂停，可在队列中继续。", 8000)
+            self._show_toast(
+                title="任务已暂停",
+                detail="可在队列页点击“继续选中任务”恢复。",
+                action_text="转到队列",
+                action=lambda: self.tabs.setCurrentIndex(1),
+                duration_ms=4500,
+            )
+        elif code == 0:
             if not self._active_has_download:
                 self.progress_stage.setValue(100)
                 self.progress_stage.setFormat("元数据抓取: 100%")
@@ -2504,7 +2790,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.lbl_progress_status.setText("任务失败，请查看日志")
             self.status.showMessage("任务失败，请检查日志输出。", 8000)
 
-        if finished_task is not None and self.active_run_kind == "download_queue":
+        if finished_task is not None and self.active_run_kind == "download_queue" and not self.pause_requested:
             wd = Path(finished_task.workdir)
             ok_n, fail_n, unk_n, session_path, report_path = self._read_download_summary(wd)
             msg = f"下载完成摘要：成功 {ok_n} | 失败 {fail_n} | 其他 {unk_n}"
@@ -2513,15 +2799,42 @@ class MainWindow(QtWidgets.QMainWindow):
             msg += f"\n报告：{report_path}"
             self.append_log(f"[摘要] {msg}\n")
             self.status.showMessage(msg.replace("\n", " | "), 10000)
+            out_dir = session_path.strip() if session_path else finished_task.download_dir
+            self._last_download_output_dir = out_dir
+            if code == 0:
+                self._show_toast(
+                    title="下载完成",
+                    detail=f"成功 {ok_n} | 失败 {fail_n} | 其他 {unk_n}",
+                    action_text="打开目录",
+                    action=self._open_last_download_output_dir,
+                    duration_ms=5500,
+                )
+            else:
+                self._show_toast(
+                    title="下载失败",
+                    detail=f"{finished_task.vehicle}，请查看日志排查。",
+                    action_text="查看日志",
+                    action=lambda: self.tabs.setCurrentIndex(2),
+                    duration_ms=6500,
+                )
             if not self.download_all_mode:
                 QtWidgets.QMessageBox.information(self, "下载摘要", msg)
+            self.refresh_downloaded_view()
+            if code == 0:
+                self.tabs.setCurrentIndex(3)
 
         finished_kind = self.active_run_kind
-        was_queue_mode = self.active_queue_index is not None and self.active_run_kind == "filter_queue"
+        was_queue_mode = (
+            self.active_queue_index is not None
+            and self.active_run_kind == "filter_queue"
+            and not self.pause_requested
+        )
         self._refresh_queue_list()
+        self.refresh_downloaded_view()
         self.active_queue_index = None
         self.active_workdir = None
         self.active_run_kind = "adhoc"
+        self.pause_requested = False
         self._save_settings()
         if was_queue_mode:
             self._start_next_pending()
@@ -2569,6 +2882,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # type: ignore[override]
         self._save_settings()
         return super().closeEvent(event)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # type: ignore[override]
+        super().resizeEvent(event)
+        self._adjust_config_layout_for_width()
+        if self._toast.isVisible():
+            self._toast._reposition_to_parent_corner()
 
 
 def main() -> int:
