@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
+import ui_theme
 
 
 SETTINGS_FILE = Path(__file__).with_name("gui_settings.json")
@@ -215,162 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         QtCore.QTimer.singleShot(1200, self._check_tools_after_maint)
 
     def _apply_ui_theme(self) -> None:
-        self.setStyleSheet(
-            """
-            QWidget {
-                font-family: "Source Han Sans SC", "Microsoft YaHei UI", "PingFang SC";
-                font-size: 13px;
-                color: #1f2a3d;
-            }
-            QMainWindow, QWidget#root {
-                background: #edf2f8;
-            }
-            QGroupBox {
-                border: 1px solid #d9e2f0;
-                border-radius: 14px;
-                margin-top: 14px;
-                padding-top: 14px;
-                padding-left: 10px;
-                padding-right: 10px;
-                padding-bottom: 10px;
-                background: #ffffff;
-                font-weight: 600;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 8px 0 8px;
-                color: #173f78;
-                background: #edf2f8;
-                border-radius: 6px;
-            }
-            QGroupBox#mini {
-                margin-top: 10px;
-                border-radius: 10px;
-                padding-top: 10px;
-                background: #f8fbff;
-            }
-            QGroupBox#mini::title {
-                color: #47648d;
-                font-size: 12px;
-            }
-            QTabWidget::pane {
-                border: 1px solid #d9e2f0;
-                border-radius: 14px;
-                background: #ffffff;
-                top: -1px;
-            }
-            QTabBar::tab {
-                background: #e7eef8;
-                border: 1px solid #d2dcec;
-                border-bottom: none;
-                border-top-left-radius: 10px;
-                border-top-right-radius: 10px;
-                padding: 9px 18px;
-                margin-right: 6px;
-                color: #2c4c82;
-            }
-            QTabBar::tab:selected {
-                background: #fdfefe;
-                color: #123b75;
-                font-weight: 600;
-            }
-            QTabBar::tab:hover:!selected {
-                background: #dfe8f6;
-            }
-            QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTableView, QListWidget {
-                border: 1px solid #c8d4e8;
-                border-radius: 9px;
-                padding: 7px 9px;
-                background: #ffffff;
-                selection-background-color: #c8ddff;
-            }
-            QSplitter::handle {
-                background: #e1e9f5;
-                border-radius: 3px;
-            }
-            QSplitter::handle:horizontal {
-                width: 6px;
-            }
-            QSplitter::handle:horizontal:hover {
-                background: #c7d7ef;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QPlainTextEdit:focus {
-                border: 1px solid #4f83d1;
-            }
-            QPushButton, QToolButton {
-                border: 1px solid #bfcee7;
-                border-radius: 9px;
-                padding: 8px 13px;
-                background: #f4f7fc;
-                color: #27436f;
-            }
-            QPushButton:hover, QToolButton:hover {
-                background: #eaf1fc;
-            }
-            QPushButton#primary {
-                background: #1f66d1;
-                color: #ffffff;
-                border: 1px solid #1a57af;
-                font-weight: 600;
-            }
-            QPushButton#primary:hover {
-                background: #1758b2;
-            }
-            QPushButton#secondary, QToolButton#secondary {
-                background: #f5f8fd;
-                color: #2e4f82;
-                border: 1px solid #c8d7ee;
-                font-weight: 500;
-            }
-            QPushButton#secondary:hover, QToolButton#secondary:hover {
-                background: #eaf1fc;
-            }
-            QPushButton#danger {
-                background: #bf3a3a;
-                color: #ffffff;
-                border: 1px solid #a53434;
-                font-weight: 600;
-            }
-            QPushButton#danger:hover {
-                background: #a53434;
-            }
-            QProgressBar {
-                border: 1px solid #c8d4e8;
-                border-radius: 7px;
-                text-align: center;
-                background: #f3f6fb;
-                min-height: 14px;
-            }
-            QProgressBar::chunk {
-                border-radius: 6px;
-                background-color: #1f66d1;
-            }
-            QHeaderView::section {
-                background: #e8eef8;
-                border: 0px;
-                border-right: 1px solid #d2dcec;
-                border-bottom: 1px solid #d2dcec;
-                padding: 6px 8px;
-                color: #27436f;
-                font-weight: 600;
-            }
-            QTableView {
-                gridline-color: #e1e8f3;
-            }
-            QStatusBar {
-                background: #e8eef8;
-                border-top: 1px solid #d2dcec;
-            }
-            QLabel#hint {
-                color: #60789c;
-            }
-            QListWidget#videoFeed {
-                border: none;
-                background: transparent;
-            }
-            """
-        )
+        self.setStyleSheet(ui_theme.build_main_stylesheet())
 
     def _init_ui(self) -> None:
         w = QtWidgets.QWidget()
@@ -382,13 +228,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         title_row = QtWidgets.QHBoxLayout()
         title = QtWidgets.QLabel("YouTube 视频下载工具")
-        title.setStyleSheet("font-size:24px; font-weight:700; color:#123c76; letter-spacing:0.3px;")
+        title.setObjectName("appTitle")
         title_row.addWidget(title)
         title_row.addStretch()
         self.lbl_progress_status = QtWidgets.QLabel("就绪")
-        self.lbl_progress_status.setStyleSheet(
-            "font-size:12px; font-weight:600; color:#21508f; background:#e8f0ff; border:1px solid #c8d9f2; padding:4px 10px; border-radius:12px;"
-        )
+        self.lbl_progress_status.setObjectName("statusBadge")
         self.lbl_progress_status.setMaximumWidth(520)
         title_row.addWidget(self.lbl_progress_status, 0, QtCore.Qt.AlignVCenter)
         layout.addLayout(title_row)
@@ -656,11 +500,11 @@ class MainWindow(QtWidgets.QMainWindow):
         maint_box = QtWidgets.QGroupBox("工具维护 (yt-dlp / ffmpeg)")
         maint_layout = QtWidgets.QGridLayout(maint_box)
         self.lbl_tools_summary = QtWidgets.QLabel("状态: 未检查")
-        self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#555;")
+        self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("neutral"))
         self.lbl_ytdlp_ver = QtWidgets.QLabel("yt-dlp 当前: - | 最新: - | 更新状态: 未检查")
         self.lbl_ffmpeg_ver = QtWidgets.QLabel("ffmpeg 当前: - | 最新: - | 更新状态: 未检查")
         self.lbl_tools_checked_at = QtWidgets.QLabel("最后检查: -")
-        self.lbl_tools_checked_at.setStyleSheet("color:#666;")
+        self.lbl_tools_checked_at.setStyleSheet(ui_theme.muted_text_style())
         self.btn_check_tools = QtWidgets.QPushButton("检查版本")
         self.btn_check_tools.clicked.connect(self.on_check_tools)
         self.btn_update_ytdlp = QtWidgets.QPushButton("更新 yt-dlp")
@@ -703,7 +547,7 @@ class MainWindow(QtWidgets.QMainWindow):
         left_layout = QtWidgets.QVBoxLayout(left_box)
         left_layout.setSpacing(8)
         self.lbl_queue_stats = QtWidgets.QLabel("队列任务: 0")
-        self.lbl_queue_stats.setStyleSheet("font-size:14px; font-weight:600; color:#153a72;")
+        self.lbl_queue_stats.setObjectName("sectionTitle")
         self.lbl_queue_focus = QtWidgets.QLabel("当前选中: 无")
         self.lbl_queue_focus.setObjectName("hint")
         self.lbl_queue_focus.setWordWrap(True)
@@ -1022,7 +866,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if not self.cfg.python_exe:
             self.lbl_tools_summary.setText("状态: 未找到系统 Python，无法检查/更新 yt-dlp")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
             self.lbl_ytdlp_ver.setText("yt-dlp 当前: 未知 | 最新: 未知 | 更新状态: 需安装 Python")
             self.lbl_ffmpeg_ver.setText("ffmpeg 当前: 未检查 | 最新: 未检查 | 更新状态: 未检查")
             self.lbl_tools_checked_at.setText(
@@ -1032,7 +876,7 @@ class MainWindow(QtWidgets.QMainWindow):
         script = self._build_tool_check_script()
         self._tool_check_output = ""
         self.lbl_tools_summary.setText("状态: 正在后台检查版本...")
-        self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#47648d;")
+        self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("info"))
         self.tool_check_proc.setWorkingDirectory(str(Path(__file__).parent))
         self.tool_check_proc.start(self.cfg.python_exe, ["-c", script])
 
@@ -1180,19 +1024,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if (y_ok and not y_need) and (f_ok and not f_need):
             self.lbl_tools_summary.setText("状态: 两个工具均可用且已是最新")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#1b5e20;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("success"))
         elif y_ok and f_ok and (y_need or f_need):
             self.lbl_tools_summary.setText("状态: 工具可用，但存在可更新版本")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         elif y_ok and not f_ok:
             self.lbl_tools_summary.setText("状态: yt-dlp 可用，ffmpeg 缺失/异常")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         elif (not y_ok) and f_ok:
             self.lbl_tools_summary.setText("状态: ffmpeg 可用，yt-dlp 异常")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b26a00;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("warning"))
         else:
             self.lbl_tools_summary.setText("状态: yt-dlp 与 ffmpeg 均异常或缺失")
-            self.lbl_tools_summary.setStyleSheet("font-weight:600; color:#b00020;")
+            self.lbl_tools_summary.setStyleSheet(ui_theme.tools_summary_style("danger"))
 
     def on_check_tools(self) -> None:
         self.append_log("\n[维护] 检查版本...\n")
@@ -1327,13 +1171,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 old_w["card"].deleteLater()
             self._reflow_active_cards()
         card = QtWidgets.QFrame()
-        card.setStyleSheet("QFrame{background:#ffffff;border:1px solid #d6deea;border-radius:8px;}")
+        card.setStyleSheet(ui_theme.active_task_card_style())
         v = QtWidgets.QVBoxLayout(card)
         v.setContentsMargins(8, 6, 8, 6)
         v.setSpacing(4)
         lbl_title = QtWidgets.QLabel((label or f"id={key}")[:42])
         lbl_title.setToolTip(label or f"id={key}")
-        lbl_title.setStyleSheet("font-size:12px;font-weight:600;color:#173a71;")
+        lbl_title.setStyleSheet(ui_theme.active_task_title_style())
         bar = QtWidgets.QProgressBar()
         bar.setRange(0, 100)
         bar.setValue(0)
@@ -2053,7 +1897,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _make_video_card(self, idx: int, row: dict) -> QtWidgets.QWidget:
         card = QtWidgets.QFrame()
         card.setFrameShape(QtWidgets.QFrame.StyledPanel)
-        card.setStyleSheet("QFrame{background:#ffffff;border:1px solid #d8e2f0;border-radius:12px;}")
+        card.setStyleSheet(ui_theme.video_card_style())
         card.setProperty("video_id", row.get("video_id", ""))
         h = QtWidgets.QHBoxLayout(card)
         h.setContentsMargins(10, 10, 10, 10)
@@ -2070,16 +1914,16 @@ class MainWindow(QtWidgets.QMainWindow):
         v = QtWidgets.QVBoxLayout()
         v.setSpacing(5)
         title = QtWidgets.QLabel(row.get("title", "(无标题)"))
-        title.setStyleSheet("font-size:15px; font-weight:600; color:#102f5d;")
+        title.setStyleSheet(ui_theme.video_title_style())
         title.setWordWrap(True)
         title.setMaximumHeight(44)
         meta = QtWidgets.QLabel(
             f"作者 {row.get('channel', '-')}  ·  上传 {row.get('upload_date', '-')}  ·  时长 {self._format_duration(str(row.get('duration', '-')))}"
         )
-        meta.setStyleSheet("color:#657f9f; font-size:12px;")
+        meta.setStyleSheet(ui_theme.video_meta_style())
         url = QtWidgets.QLabel(row.get("watch_url", ""))
         url.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        url.setStyleSheet("color:#456a97; font-size:12px;")
+        url.setStyleSheet(ui_theme.video_url_style())
         v.addWidget(title)
         v.addWidget(meta)
         v.addWidget(url)
