@@ -143,6 +143,33 @@ def build_main_stylesheet() -> str:
     QPushButton#danger:hover {{
         background: #DC423C;
     }}
+    QMenu {{
+        background: {t["bg_elev1"]};
+        color: {t["text_primary"]};
+        border: 1px solid {t["border_default"]};
+        border-radius: 10px;
+        padding: 6px;
+    }}
+    QMenu::item {{
+        padding: 8px 12px;
+        margin: 2px 0;
+        border-radius: 8px;
+        color: {t["text_primary"]};
+        background: transparent;
+    }}
+    QMenu::item:selected {{
+        background: {t["bg_elev2"]};
+        color: {t["text_primary"]};
+    }}
+    QMenu::item:disabled {{
+        color: #6F6F6F;
+        background: transparent;
+    }}
+    QMenu::separator {{
+        height: 1px;
+        margin: 6px 4px;
+        background: {t["border_default"]};
+    }}
     QProgressBar {{
         border: 1px solid {t["border_default"]};
         border-radius: 7px;
