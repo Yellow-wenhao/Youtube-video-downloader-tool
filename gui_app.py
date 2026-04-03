@@ -276,6 +276,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.active_run_kind: str = "adhoc"  # adhoc | filter_queue | download_queue
         self.download_all_mode: bool = False
         self.user_stopped = False
+        self.pause_requested = False
         self._log_line_buffer = ""
         self._stage_step = 0
         self._active_has_download = False
@@ -301,6 +302,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.thumb_ready.connect(self._on_thumb_ready)
         self._toast = DownloadToast(self)
         self._last_download_output_dir = ""
+        self.downloaded_records: list[dict] = []
 
         self._init_ui()
         self._apply_ui_theme()
@@ -388,7 +390,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.side_nav.setObjectName("sideNav")
         self.side_nav.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.side_nav.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.side_nav.addItems(["任务配置", "队列执行", "日志结果"])
+        self.side_nav.addItems(["任务配置", "队列执行", "日志结果", "已下载"])
         self.side_nav.currentRowChanged.connect(self._on_side_nav_changed)
         nav_layout.addWidget(self.side_nav)
         body_row.addWidget(nav_box, 0)
@@ -675,6 +677,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_download_selected.setObjectName("primary")
         self.btn_download_selected.clicked.connect(self.download_selected_task)
 
+        self.btn_pause = QtWidgets.QPushButton("暂停当前任务")
+        self.btn_pause.setObjectName("secondary")
+        self.btn_pause.clicked.connect(self.pause_current_task)
+
+        self.btn_resume = QtWidgets.QPushButton("继续选中任务")
+        self.btn_resume.setObjectName("secondary")
+        self.btn_resume.clicked.connect(self.resume_selected_task)
+
         self.btn_stop = QtWidgets.QPushButton("停止当前任务")
         self.btn_stop.setObjectName("danger")
         self.btn_stop.clicked.connect(self.on_stop_clicked)
@@ -710,6 +720,11 @@ class MainWindow(QtWidgets.QMainWindow):
         ops_layout.setSpacing(8)
         ops_layout.addWidget(self.btn_start_queue)
         ops_layout.addWidget(self.btn_download_selected)
+        row_pause = QtWidgets.QHBoxLayout()
+        row_pause.setSpacing(8)
+        row_pause.addWidget(self.btn_pause, 1)
+        row_pause.addWidget(self.btn_resume, 1)
+        ops_layout.addLayout(row_pause)
         row_ctrl = QtWidgets.QHBoxLayout()
         row_ctrl.setSpacing(8)
         row_ctrl.addWidget(self.btn_stop, 1)
@@ -801,8 +816,38 @@ class MainWindow(QtWidgets.QMainWindow):
         tab_output_layout.addWidget(self.te_log, 1)
         self.model = CsvPreviewModel(self)
         tabs.addTab(tab_output, "3. 日志结果")
+
+        tab_downloaded = QtWidgets.QWidget()
+        tab_downloaded_layout = QtWidgets.QVBoxLayout(tab_downloaded)
+        tab_downloaded_layout.setContentsMargins(0, 0, 0, 0)
+        tab_downloaded_layout.setSpacing(8)
+        row_dl_ops = QtWidgets.QHBoxLayout()
+        self.btn_refresh_downloaded = QtWidgets.QPushButton("刷新已下载")
+        self.btn_refresh_downloaded.setObjectName("secondary")
+        self.btn_refresh_downloaded.clicked.connect(self.refresh_downloaded_view)
+        self.btn_open_downloaded_dir = QtWidgets.QPushButton("打开目录")
+        self.btn_open_downloaded_dir.setObjectName("secondary")
+        self.btn_open_downloaded_dir.clicked.connect(self.open_selected_downloaded_dir)
+        self.btn_open_downloaded_report = QtWidgets.QPushButton("打开报告 CSV")
+        self.btn_open_downloaded_report.setObjectName("secondary")
+        self.btn_open_downloaded_report.clicked.connect(self.open_selected_downloaded_report)
+        row_dl_ops.addWidget(self.btn_refresh_downloaded)
+        row_dl_ops.addWidget(self.btn_open_downloaded_dir)
+        row_dl_ops.addWidget(self.btn_open_downloaded_report)
+        row_dl_ops.addStretch()
+        tab_downloaded_layout.addLayout(row_dl_ops)
+        self.downloaded_list = QtWidgets.QListWidget()
+        self.downloaded_list.currentRowChanged.connect(self._update_downloaded_detail)
+        tab_downloaded_layout.addWidget(self.downloaded_list, 1)
+        self.lbl_downloaded_detail = QtWidgets.QLabel("暂无下载记录")
+        self.lbl_downloaded_detail.setObjectName("hint")
+        self.lbl_downloaded_detail.setWordWrap(True)
+        tab_downloaded_layout.addWidget(self.lbl_downloaded_detail)
+        tabs.addTab(tab_downloaded, "4. 已下载")
+
         tabs.currentChanged.connect(self._on_main_tab_changed)
         self.side_nav.setCurrentRow(0)
+        self.refresh_downloaded_view()
 
         self._normalize_ui_sizes()
         self.status = self.statusBar()
@@ -863,6 +908,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for b in [
             self.btn_start_queue,
             self.btn_download_selected,
+            self.btn_pause,
+            self.btn_resume,
             self.btn_stop,
         ]:
             b.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
@@ -2131,6 +2178,124 @@ class MainWindow(QtWidgets.QMainWindow):
         rows = sorted({idx.row() for idx in self.queue_list.selectedIndexes()})
         return [r for r in rows if 0 <= r < len(self.task_queue)]
 
+    def _selected_downloaded_record(self) -> Optional[dict]:
+        row = self.downloaded_list.currentRow() if hasattr(self, "downloaded_list") else -1
+        if row < 0 or row >= len(self.downloaded_records):
+            return None
+        return self.downloaded_records[row]
+
+    def _collect_downloaded_records(self) -> list[dict]:
+        records: list[dict] = []
+        for task in self.task_queue:
+            if task.status not in {"downloaded", "download_failed", "downloading", "paused_download"} and task.selected_count <= 0:
+                continue
+            ok_n, fail_n, unk_n, session_path, report_path = self._read_download_summary(Path(task.workdir))
+            out_dir = session_path.strip() if session_path.strip() else task.download_dir
+            records.append(
+                {
+                    "task_name": task.vehicle,
+                    "status": task.status,
+                    "ok": ok_n,
+                    "fail": fail_n,
+                    "unknown": unk_n,
+                    "dir": out_dir,
+                    "report": report_path,
+                    "run_id": task.run_id,
+                }
+            )
+        records.sort(key=lambda r: str(r.get("run_id", "")), reverse=True)
+        return records
+
+    def refresh_downloaded_view(self) -> None:
+        self.downloaded_records = self._collect_downloaded_records()
+        self.downloaded_list.clear()
+        if not self.downloaded_records:
+            self.lbl_downloaded_detail.setText("暂无下载记录")
+            return
+        status_label = {
+            "downloaded": "已完成",
+            "download_failed": "失败",
+            "downloading": "下载中",
+            "paused_download": "已暂停",
+        }
+        for rec in self.downloaded_records:
+            st = status_label.get(str(rec.get("status", "")), str(rec.get("status", "")))
+            text = (
+                f"[{st}] {rec.get('task_name', '-')[:28]} | 成功 {rec.get('ok', 0)} "
+                f"失败 {rec.get('fail', 0)} 其他 {rec.get('unknown', 0)}"
+            )
+            item = QtWidgets.QListWidgetItem(text)
+            self.downloaded_list.addItem(item)
+        self.downloaded_list.setCurrentRow(0)
+
+    def _update_downloaded_detail(self, row: int) -> None:
+        if row < 0 or row >= len(self.downloaded_records):
+            self.lbl_downloaded_detail.setText("暂无下载记录")
+            return
+        rec = self.downloaded_records[row]
+        self.lbl_downloaded_detail.setText(
+            f"任务: {rec.get('task_name', '-')}\n"
+            f"状态: {rec.get('status', '-')}\n"
+            f"成功: {rec.get('ok', 0)} | 失败: {rec.get('fail', 0)} | 其他: {rec.get('unknown', 0)}\n"
+            f"目录: {rec.get('dir', '-')}\n"
+            f"报告: {rec.get('report', '-')}"
+        )
+
+    def open_selected_downloaded_dir(self) -> None:
+        rec = self._selected_downloaded_record()
+        if rec is None:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一条下载记录。")
+            return
+        self._open_dir(str(rec.get("dir", "")))
+
+    def open_selected_downloaded_report(self) -> None:
+        rec = self._selected_downloaded_record()
+        if rec is None:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一条下载记录。")
+            return
+        report = Path(str(rec.get("report", "")))
+        if not report.exists():
+            QtWidgets.QMessageBox.information(self, "提示", f"报告不存在: {report}")
+            return
+        if sys.platform.startswith("win"):
+            os.startfile(str(report))  # type: ignore[attr-defined]
+        elif sys.platform == "darwin":
+            QtCore.QProcess.startDetached("open", [str(report)])
+        else:
+            QtCore.QProcess.startDetached("xdg-open", [str(report)])
+
+    def pause_current_task(self) -> None:
+        if self.runner.proc.state() == QtCore.QProcess.NotRunning:
+            QtWidgets.QMessageBox.information(self, "提示", "当前没有正在运行的任务。")
+            return
+        self.pause_requested = True
+        self.user_stopped = False
+        self.download_all_mode = False
+        self.lbl_progress_status.setText("正在暂停任务...")
+        self.runner.kill()
+
+    def resume_selected_task(self) -> None:
+        if self.runner.proc.state() != QtCore.QProcess.NotRunning:
+            QtWidgets.QMessageBox.warning(self, "正在运行", "请先等待当前任务结束。")
+            return
+        rows = self._selected_queue_rows()
+        if not rows:
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一个任务。")
+            return
+        row = rows[0]
+        task = self.task_queue[row]
+        if task.status == "paused_filter":
+            self.active_queue_index = row
+            self.active_run_kind = "filter_queue"
+            task.status = "running"
+            self._refresh_queue_list()
+            self._start_process(task.args, task.workdir)
+            return
+        if task.status == "paused_download":
+            self._start_download_for_row(row)
+            return
+        QtWidgets.QMessageBox.information(self, "提示", "选中任务不是可继续状态。")
+
     def _on_queue_item_double_clicked(self, _item: QtWidgets.QListWidgetItem) -> None:
         self.load_selected_task_videos()
         if self.tabs.currentIndex() != 1:
@@ -2401,6 +2566,7 @@ class MainWindow(QtWidgets.QMainWindow):
             )
             return
         self.user_stopped = False
+        self.pause_requested = False
         self._log_line_buffer = ""
         self._stage_step = 0
         self._active_has_download = ("--download" in args) or ("--download-from-urls-file" in args)
@@ -2451,6 +2617,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def on_stop_clicked(self) -> None:
         self.user_stopped = True
+        self.pause_requested = False
         self.download_all_mode = False
         self.lbl_progress_status.setText("正在停止任务...")
         self.runner.kill()
@@ -2459,6 +2626,8 @@ class MainWindow(QtWidgets.QMainWindow):
         s = (status or "").strip()
         if s in {"running", "downloading"}:
             return QtGui.QColor(ui_theme.TOKENS["state_info"])
+        if s in {"paused_filter", "paused_download"}:
+            return QtGui.QColor(ui_theme.TOKENS["state_warning"])
         if s in {"failed", "download_failed"}:
             return QtGui.QColor(ui_theme.TOKENS["state_error"])
         if s in {"done", "ready_download", "downloaded", "filtered_empty"}:
@@ -2473,9 +2642,11 @@ class MainWindow(QtWidgets.QMainWindow):
             prefix = {
                 "pending": "待运行",
                 "running": "运行中",
+                "paused_filter": "已暂停·筛选",
                 "ready_download": "已筛选·待下载",
                 "filtered_empty": "已筛选·无结果",
                 "downloading": "下载中",
+                "paused_download": "已暂停·下载",
                 "downloaded": "下载完成",
                 "download_failed": "下载失败",
                 "done": "已完成",
@@ -2484,7 +2655,7 @@ class MainWindow(QtWidgets.QMainWindow):
             }.get(task.status, task.status)
             if task.status == "pending":
                 pending_count += 1
-            if task.status in {"ready_download", "download_failed", "downloaded"}:
+            if task.status in {"ready_download", "download_failed", "downloaded", "paused_download"}:
                 ready_count += 1
             short_query = (task.vehicle or "").strip() or "未命名查询"
             if len(short_query) > 24:
@@ -2523,7 +2694,14 @@ class MainWindow(QtWidgets.QMainWindow):
             task = self.task_queue[self.active_queue_index]
             finished_task = task
             task.exit_code = code
-            if self.user_stopped:
+            if self.pause_requested:
+                if self.active_run_kind == "filter_queue":
+                    task.status = "paused_filter"
+                elif self.active_run_kind == "download_queue":
+                    task.status = "paused_download"
+                else:
+                    task.status = "stopped"
+            elif self.user_stopped:
                 task.status = "stopped"
             else:
                 if self.active_run_kind == "filter_queue":
@@ -2550,7 +2728,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     task.status = "done" if code == 0 else "failed"
 
-        if code == 0:
+        if self.pause_requested:
+            self.lbl_progress_status.setText("任务已暂停")
+            self.status.showMessage("任务已暂停，可在队列中继续。", 8000)
+            self._show_toast(
+                title="任务已暂停",
+                detail="可在队列页点击“继续选中任务”恢复。",
+                action_text="转到队列",
+                action=lambda: self.tabs.setCurrentIndex(1),
+                duration_ms=4500,
+            )
+        elif code == 0:
             if not self._active_has_download:
                 self.progress_stage.setValue(100)
                 self.progress_stage.setFormat("元数据抓取: 100%")
@@ -2586,7 +2774,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.lbl_progress_status.setText("任务失败，请查看日志")
             self.status.showMessage("任务失败，请检查日志输出。", 8000)
 
-        if finished_task is not None and self.active_run_kind == "download_queue":
+        if finished_task is not None and self.active_run_kind == "download_queue" and not self.pause_requested:
             wd = Path(finished_task.workdir)
             ok_n, fail_n, unk_n, session_path, report_path = self._read_download_summary(wd)
             msg = f"下载完成摘要：成功 {ok_n} | 失败 {fail_n} | 其他 {unk_n}"
@@ -2615,13 +2803,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
             if not self.download_all_mode:
                 QtWidgets.QMessageBox.information(self, "下载摘要", msg)
+            self.refresh_downloaded_view()
+            if code == 0:
+                self.tabs.setCurrentIndex(3)
 
         finished_kind = self.active_run_kind
-        was_queue_mode = self.active_queue_index is not None and self.active_run_kind == "filter_queue"
+        was_queue_mode = (
+            self.active_queue_index is not None
+            and self.active_run_kind == "filter_queue"
+            and not self.pause_requested
+        )
         self._refresh_queue_list()
+        self.refresh_downloaded_view()
         self.active_queue_index = None
         self.active_workdir = None
         self.active_run_kind = "adhoc"
+        self.pause_requested = False
         self._save_settings()
         if was_queue_mode:
             self._start_next_pending()
