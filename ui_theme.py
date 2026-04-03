@@ -177,6 +177,28 @@ def build_main_stylesheet() -> str:
         border: none;
         background: transparent;
     }}
+    QListWidget#sideNav {{
+        border: 1px solid {t["border_default"]};
+        border-radius: 10px;
+        background: {t["bg_elev1"]};
+        padding: 6px;
+    }}
+    QListWidget#sideNav::item {{
+        border: 1px solid transparent;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin: 2px 0;
+        color: {t["text_secondary"]};
+    }}
+    QListWidget#sideNav::item:hover {{
+        background: {t["bg_elev2"]};
+        color: {t["text_primary"]};
+    }}
+    QListWidget#sideNav::item:selected {{
+        background: #2A1A1A;
+        color: {t["text_primary"]};
+        border: 1px solid {t["accent_red"]};
+    }}
     QLabel#appTitle {{
         font-size: 24px;
         font-weight: 700;
