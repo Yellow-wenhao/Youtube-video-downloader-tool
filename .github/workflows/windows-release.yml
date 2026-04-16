@@ -6,6 +6,9 @@ on:
     tags:
       - "v*"
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -48,16 +51,11 @@ jobs:
 
       - name: Publish GitHub release
         if: github.ref_type == 'tag'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: pwsh
-        run: |
-          $tag = "${{ github.ref_name }}"
-          $zip = "build/release/youtube-downloader-web-v${{ steps.version.outputs.value }}-win-x64-portable.zip"
-          $setup = "build/release/youtube-downloader-web-v${{ steps.version.outputs.value }}-win-x64-setup.exe"
-          gh release view $tag *> $null
-          if ($LASTEXITCODE -ne 0) {
-            gh release create $tag $zip $setup --title $tag --generate-notes
-          } else {
-            gh release upload $tag $zip $setup --clobber
-          }
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            build/release/*.zip
+            build/release/*.exe
