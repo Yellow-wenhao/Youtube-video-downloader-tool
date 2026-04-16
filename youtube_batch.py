@@ -15,6 +15,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.core.cli_pipeline_service import BatchCliOptions, run_batch_cli
+from app.core.app_paths import default_download_dir, default_workdir
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
@@ -29,8 +30,8 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=[],
         help="直接输入查询词（可重复传入；若提供则优先于 --query-file）",
     )
-    parser.add_argument("--workdir", type=Path, default=Path("./video_info"), help="中间结果输出目录")
-    parser.add_argument("--download-dir", type=Path, default=Path("./downloads"), help="视频下载目录")
+    parser.add_argument("--workdir", type=Path, default=default_workdir(), help="中间结果输出目录")
+    parser.add_argument("--download-dir", type=Path, default=default_download_dir(), help="视频下载目录")
     parser.add_argument("--search-limit", type=int, default=50, help="每个关键词抓取的搜索结果条数")
     parser.add_argument("--metadata-workers", type=int, default=1, help="第 2 步元数据抓取并发数（1=串行）")
     parser.add_argument("--min-duration", type=int, default=120, help="最低时长（秒），低于则降分且通常不入选")

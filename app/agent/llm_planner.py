@@ -16,6 +16,7 @@ from app.agent.planner import (
     PlannerSchemaError,
 )
 from app.agent.prompt_loader import render_prompt_template
+from app.core.app_paths import default_download_dir
 from app.core.download_workspace_service import download_workspace_paths
 from app.core.models import TaskStep
 
@@ -371,7 +372,7 @@ class LLMPlanner(AgentPlanner):
         context = {
             "user_request": user_request,
             "workdir": str(Path(workdir)),
-            "default_download_dir": _clean_text(defaults.get("download_dir") or (Path(workdir) / "downloads")),
+            "default_download_dir": _clean_text(defaults.get("download_dir") or default_download_dir()),
             "binary": _clean_text(defaults.get("binary") or "yt-dlp"),
             "cookies_from_browser": _clean_text(defaults.get("cookies_from_browser")),
             "cookies_file": _clean_text(defaults.get("cookies_file")),
@@ -552,7 +553,7 @@ class LLMPlanner(AgentPlanner):
                     tool_name="start_download",
                     payload={
                         "workdir": workdir_str,
-                        "download_dir": str(Path(params.get("download_dir") or (Path(workdir_str) / "downloads"))),
+                        "download_dir": str(Path(params.get("download_dir") or default_download_dir())),
                         "items_path": "{{steps.filter.scored_items_path}}",
                         **self._download_tool_payload(params),
                     },
@@ -658,7 +659,7 @@ class LLMPlanner(AgentPlanner):
             "extra_args": extra_args,
             "metadata_workers": _clean_int(payload.get("metadata_workers", defaults.get("metadata_workers", 1)), 1, minimum=1, maximum=16),
             "min_duration": _clean_int(payload.get("min_duration", defaults.get("min_duration", 30)), 30, minimum=0, maximum=7200),
-            "download_dir": _clean_text(defaults.get("download_dir") or (Path(workdir_str) / "downloads")),
+            "download_dir": _clean_text(defaults.get("download_dir") or default_download_dir()),
             "download_mode": _clean_text(payload.get("download_mode", defaults.get("download_mode", "video"))) or "video",
             "include_audio": _clean_bool(payload.get("include_audio", defaults.get("include_audio", True)), True),
             "video_container": _clean_text(payload.get("video_container", defaults.get("video_container", "auto"))) or "auto",

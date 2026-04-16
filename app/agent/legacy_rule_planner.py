@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agent.planner import AgentPlanner, PlanDraft
+from app.core.app_paths import default_download_dir
 from app.core.download_workspace_service import download_workspace_paths
 from app.core.models import TaskStep
 
@@ -224,7 +225,7 @@ class LegacyRuleBasedPlanner(AgentPlanner):
                     tool_name="start_download",
                     payload={
                         "workdir": workdir_str,
-                        "download_dir": str(Path(params.get("download_dir") or (Path(workdir_str) / "downloads"))),
+            "download_dir": str(Path(params.get("download_dir") or default_download_dir())),
                         "items_path": "{{steps.filter.scored_items_path}}",
                         **self._download_tool_payload(params),
                     },
@@ -432,7 +433,7 @@ class LegacyRuleBasedPlanner(AgentPlanner):
             "extra_args": list(defaults.get("extra_args", [])),
             "metadata_workers": int(defaults.get("metadata_workers", 1)),
             "min_duration": int(defaults.get("min_duration", 30)),
-            "download_dir": defaults.get("download_dir", str(Path(defaults.get("workdir", ".")) / "downloads")),
+            "download_dir": defaults.get("download_dir", str(default_download_dir())),
             "download_mode": defaults.get("download_mode", "video"),
             "include_audio": bool(defaults.get("include_audio", True)),
             "video_container": defaults.get("video_container", "auto"),

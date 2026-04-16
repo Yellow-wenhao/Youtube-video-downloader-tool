@@ -333,12 +333,12 @@ class AgentRunnerPlanningError(AgentRunnerError):
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Agent runner for the YouTube downloader")
+    parser = argparse.ArgumentParser(description="Agent runner for the local YouTube Downloader workspace")
     parser.add_argument("request", help="Natural-language request for the agent")
     parser.add_argument(
         "--workdir",
         default=str(default_workdir()),
-        help="Agent workdir (defaults to the local YTBDLP workspace directory)",
+        help="Agent workdir (defaults to the local application workspace directory)",
     )
     parser.add_argument("--auto-confirm", action="store_true", help="Automatically approve download steps")
     parser.add_argument("--resume-task-id", default="", help="Resume an existing task by id")

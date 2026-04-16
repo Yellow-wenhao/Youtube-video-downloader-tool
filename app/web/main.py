@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -41,6 +42,7 @@ from app.core.review_service import (
     thumbnail_url,
 )
 from app.web.failure_diagnosis import build_task_failure_diagnosis
+from app.web.runtime_host import runtime_host
 from app.web.schemas import (
     AppBootstrapResponse,
     AgentConnectionTestRequest,
@@ -82,10 +84,29 @@ from app.web.schemas import (
 )
 from app.core.models import StepStatus, TaskDownloadProgress, TaskResult, TaskSpec, TaskStatus, TaskStep, TaskSummary
 
-app = FastAPI(title="YTBDLP Web Agent", version="0.1.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    runtime_host.start()
+    yield
+    runtime_host.shutdown()
+
+
+app = FastAPI(title="YouTube Downloader Web Workspace", version="0.1.0", lifespan=_lifespan)
 
 STATIC_DIR = Path(__file__).with_name("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+
+@app.middleware("http")
+async def track_runtime_activity(request, call_next):
+    request_name = f"{request.method} {request.url.path}"
+    runtime_host.request_started(request_name)
+    try:
+        response = await call_next(request)
+    finally:
+        runtime_host.request_finished(request_name)
+    return response
 
 
 @app.get("/api/health", response_model=HealthResponse)
@@ -99,7 +120,7 @@ def app_bootstrap() -> AppBootstrapResponse:
     return AppBootstrapResponse(
         product_mode="web-first",
         workdir=str(workdir),
-        recommended_download_dir=str(default_download_dir(workdir)),
+        recommended_download_dir=str(default_download_dir()),
         workdir_source="system_default",
     )
 
@@ -745,7 +766,7 @@ def _build_queue_overview(summaries: list[TaskSummary]) -> QueueOverviewView:
 
 def _build_download_settings_view(workdir: str, defaults: dict[str, object] | None) -> DownloadSettingsView:
     payload = defaults or {}
-    base_download_dir = default_download_dir(workdir)
+    base_download_dir = default_download_dir()
     return DownloadSettingsView(
         workdir=workdir,
         download_dir=str(payload.get("download_dir") or base_download_dir),
@@ -1404,20 +1425,21 @@ def _run_task_worker(workdir: str, task_id: str, auto_confirm: bool) -> None:
     session = SessionStore(workdir)
     task = store.load_task(task_id)
     runner = AgentRunner()
-    try:
-        runner.execute_task(task, store, session, auto_confirm=auto_confirm)
-    except Exception as exc:
-        store.set_task_status(task, TaskStatus.FAILED, f"后台下载任务启动失败: {exc}")
-        store.save_result(
-            TaskResult(
-                task_id=task.task_id,
-                status=TaskStatus.FAILED,
-                message=str(exc),
-                data={"task_paths": store.task_paths(task.task_id)},
-                started_at=task.created_at,
-                finished_at=datetime.now(timezone.utc).isoformat(),
+    with runtime_host.background_job(f"task:{task_id}"):
+        try:
+            runner.execute_task(task, store, session, auto_confirm=auto_confirm)
+        except Exception as exc:
+            store.set_task_status(task, TaskStatus.FAILED, f"后台下载任务启动失败: {exc}")
+            store.save_result(
+                TaskResult(
+                    task_id=task.task_id,
+                    status=TaskStatus.FAILED,
+                    message=str(exc),
+                    data={"task_paths": store.task_paths(task.task_id)},
+                    started_at=task.created_at,
+                    finished_at=datetime.now(timezone.utc).isoformat(),
+                )
             )
-        )
 
 
 def _run_task_in_background(workdir: str, task_id: str, *, auto_confirm: bool) -> None:

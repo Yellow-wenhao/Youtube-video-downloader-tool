@@ -1,0 +1,63 @@
+name: windows-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Determine version
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $version = "${{ github.ref_name }}".TrimStart("v")
+          } else {
+            $version = "0.1.0-dev.${{ github.run_number }}"
+          }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress --yes
+
+      - name: Build release artifacts
+        shell: pwsh
+        run: .\scripts\build_windows_release.ps1 -Version "${{ steps.version.outputs.value }}"
+
+      - name: Upload workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-${{ steps.version.outputs.value }}
+          path: |
+            build/release/*.zip
+            build/release/*.exe
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $zip = "build/release/youtube-downloader-web-v${{ steps.version.outputs.value }}-win-x64-portable.zip"
+          $setup = "build/release/youtube-downloader-web-v${{ steps.version.outputs.value }}-win-x64-setup.exe"
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag $zip $setup --title $tag --generate-notes
+          } else {
+            gh release upload $tag $zip $setup --clobber
+          }

@@ -21,6 +21,7 @@ from typing import Any, Callable, Optional
 
 from PySide6 import QtCore, QtGui, QtWidgets
 from app.agent.llm_planner import provider_model_suggestions, test_llm_connection
+from app.core.app_paths import default_download_dir
 from app.core.download_workspace_service import resolve_download_session_pointers
 from app.core.task_service import TaskStore
 from app.gui.agent_bridge import AgentBridge
@@ -2650,7 +2651,7 @@ class MainWindow(QtWidgets.QMainWindow):
             task_name=task_name,
             workdir=workdir,
             run_id=task_id,
-            download_dir=str(params.get("download_dir") or (Path(workdir) / "downloads")),
+            download_dir=str(params.get("download_dir") or default_download_dir()),
             cookies_browser=str(params.get("cookies_from_browser") or ""),
             cookies_file=str(params.get("cookies_file") or ""),
             yt_extra_args=" ".join(str(x) for x in (params.get("extra_args") or [])),

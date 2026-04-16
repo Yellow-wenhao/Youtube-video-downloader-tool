@@ -7,6 +7,7 @@ from typing import Callable, Optional, Sequence
 
 from app.adapters.env_adapter import ensure_binary
 from app.adapters.yt_dlp_adapter import yt_dlp_base
+from app.core.app_paths import default_download_dir, default_workdir
 from app.core.download_service import download_selected
 from app.core.download_workspace_service import download_workspace_paths
 from app.core.filter_service import ScoringConfig, filter_candidates
@@ -28,8 +29,8 @@ class BatchCliOptions:
     binary: str = "yt-dlp"
     query_file: Path | None = None
     query_text: tuple[str, ...] = ()
-    workdir: Path = Path("./video_info")
-    download_dir: Path = Path("./downloads")
+    workdir: Path = default_workdir()
+    download_dir: Path = default_download_dir()
     search_limit: int = 50
     metadata_workers: int = 1
     min_duration: int = 120

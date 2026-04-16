@@ -30,7 +30,7 @@ function Resolve-CondaExe {
 $CondaExe = Resolve-CondaExe
 $UseConda = $null -ne $CondaExe
 
-Write-Host "Starting YTBDLP Web Agent at $Url" -ForegroundColor Cyan
+Write-Host "Starting YouTube Downloader development workspace at $Url" -ForegroundColor Cyan
 if ($UseConda) {
     Write-Host "Using conda environment: $CondaEnvName" -ForegroundColor DarkCyan
 } else {

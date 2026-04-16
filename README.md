@@ -1,98 +1,101 @@
-# YouTube Agent Downloader
+# YouTube Downloader
 
-一个基于 `yt-dlp` 的本地 Agent 下载器，正在从旧版桌面 GUI 迁移到前后端分离的网页模式。
+一个 Web-first、本地运行的 YouTube 搜索、审核与下载工具。  
+当前默认产品形态是浏览器工作台，不再以旧 PySide GUI 作为主入口。
 
-当前目标：
+## 面向普通用户的使用方式
 
-- 在浏览器中输入自然语言任务
-- 由本地 Agent 规划搜索、筛选与下载步骤
-- 通过本地后端 API 执行任务，而不是依赖 EXE 界面
-- 保留原有 CLI / 核心下载能力作为迁移基础
+推荐直接下载 Windows Release：
+
+- 安装版：`youtube-downloader-web-vX.Y.Z-win-x64-setup.exe`
+- 便携版：`youtube-downloader-web-vX.Y.Z-win-x64-portable.zip`
+
+Release 已内置：
+
+- Python runtime
+- Web 应用
+- `yt-dlp`
+- `ffmpeg` / `ffprobe`
+
+双击 `youtube-downloader.exe` 后，会静默启动本地服务并自动打开浏览器。
+
+更多说明见：
+
+- [docs/WINDOWS_RELEASE.md](docs/WINDOWS_RELEASE.md)
 
 ## 当前产品方向
 
 - Web 工作台是默认本地入口
 - `app/web/main.py`
-  - 新的本地 Web 后端入口
-- `app/web/static/index.html`
-  - 新的浏览器工作台壳
+  - 本地 Web API 与静态前端入口
+- `app/web/static/`
+  - 浏览器工作台
 - `gui_app.py`
-  - 旧版桌面 GUI，作为 legacy 兼容入口与迁移参考，不再是默认产品壳
+  - legacy 兼容入口，只保留迁移参考与必要修复
+- `youtube_batch.py`
+  - 兼容 CLI 入口
 
-## 项目结构
+## 仓库结构
 
 ```text
-D:\YTBDLP
-├─ app/
-│  ├─ agent/                  # Agent planner / runner
-│  ├─ core/                   # 可复用搜索、筛选、下载能力
-│  ├─ tools/                  # 工具层
-│  └─ web/                    # Web API 与前端壳
-├─ gui_app.py                 # 旧桌面 GUI（迁移参考）
-├─ youtube_batch.py           # 兼容 CLI 入口
-├─ requirements.txt
-└─ ...
+app/
+  agent/       planner / runner / prompts
+  core/        搜索、筛选、下载、路径与结果服务
+  tools/       agent tool wrappers
+  web/         FastAPI + 静态前端 + release 启动入口
+docs/
+tests/
+scripts/
 ```
 
-## 环境要求
+## 开发环境运行
 
-- Windows 10/11
-- Python 3.10+（推荐 3.12）
-- ffmpeg（建议加入 PATH）
-
-## 安装与运行
-
-默认启动方式：
+如果你是在源码仓库里开发，而不是使用 release：
 
 ```powershell
-cd <repo-dir>
+conda run -n <your-conda-env> python -m pip install -U -r requirements.txt
 .\run_web.bat
 ```
 
-脚本会优先使用 conda 环境启动本地 Web 服务，默认环境名为 `base`，可通过环境变量 `YTBDLP_CONDA_ENV` 覆盖。
-
-如果需要手动执行：
+或手动启动：
 
 ```powershell
-cd <repo-dir>
-conda run -n base python -m pip install -U -r requirements.txt
-conda run -n base python -m uvicorn --app-dir . app.web.main:app --reload --host 127.0.0.1 --port 8000
+conda run -n <your-conda-env> python -m uvicorn --app-dir . app.web.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
-或直接使用启动脚本：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\run_web.ps1
-```
-
-打开浏览器访问：
+默认浏览器地址：
 
 ```text
 http://127.0.0.1:8000
 ```
 
-## 迁移状态
+`run_web.ps1` / `run_web.bat` 现在是开发态脚本，不是最终发布物。
 
-- Web 后端：默认本地入口
-- 浏览器前端：默认工作台
-- 桌面 GUI：冻结为 legacy compatibility path，仅保留迁移期参考和必要兼容修复
+## 本地构建 Windows Release
 
-## CLI 兼容
+```powershell
+python -m pip install -U -r requirements.txt -r requirements-release.txt
+.\scripts\build_windows_release.ps1 -Version 0.1.0
+```
 
-旧 CLI 入口仍保留，便于迁移期间继续验证核心能力，但不再承担默认用户入口职责。
+构建产物位于：
+
+```text
+build/release/
+```
+
+GitHub tag `vX.Y.Z` 会触发自动构建并上传 release 资产。
 
 ## 测试基线
 
-当前前端自动化只保留最小 smoke 基线，不扩张成高成本 UI 自动化体系。优先保护的是 Web 工作台主链路是否还能正常渲染和完成关键交互。
-
-推荐基线命令：
+优先保护 Web 工作台主链路与核心 API 合约：
 
 ```powershell
-cd <repo-dir>
-conda run -n base python -m unittest discover -s tests -p "test_web_workspace_smoke.py"
+conda run -n <your-conda-env> python -m unittest discover -s tests -p "test_app_paths.py"
+conda run -n <your-conda-env> python -m unittest discover -s tests -p "test_web_workspace_smoke.py"
 ```
 
-如涉及 Web API / 状态流改动，再补对应后端契约测试，而不是优先增加重型前端 UI 自动化。
+如涉及状态流、审核、结果、planner 或 release 路径逻辑，再补对应后端契约测试。
 
 ## 免责声明
 
@@ -101,4 +104,4 @@ conda run -n base python -m unittest discover -s tests -p "test_web_workspace_sm
 
 ## License
 
-建议使用 MIT License（可在仓库中添加 `LICENSE` 文件）。
+MIT

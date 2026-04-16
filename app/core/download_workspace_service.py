@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from app.core.app_paths import default_download_dir
 from app.core.models import DownloadSessionRef
 from app.core.review_service import thumbnail_url
 
@@ -106,7 +107,7 @@ def download_workspace_paths(
 ) -> DownloadWorkspacePaths:
     workdir_path = Path(workdir)
     merged = _merged_download_params(defaults, params)
-    raw_download_dir = merged.get("download_dir") or (workdir_path / "downloads")
+    raw_download_dir = merged.get("download_dir") or default_download_dir()
     raw_items_path = items_path or merged.get("items_path") or (workdir_path / SCORED_ITEMS_FILENAME)
     return DownloadWorkspacePaths(
         workdir=workdir_path,
