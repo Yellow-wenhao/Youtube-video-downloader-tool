@@ -49,11 +49,11 @@
 
 - Web、CLI、未来 legacy GUI 都通过同一套 core/service 路径完成核心动作
 - `app/web/main.py` 主要负责 API 映射和 view model，不再内嵌过多业务流程判断
-- 从 `myvi_yt_batch.py` / `gui_app.py` 新发现的核心逻辑不再继续复制到 Web 层
+- 从历史 CLI wrapper / `gui_app.py` 新发现的核心逻辑不再继续复制到 Web 层
 
 TODO：
 
-- [x] 盘点 `myvi_yt_batch.py` 和 `gui_app.py` 中仍未迁移到 `app/core/` / `app/tools/` 的业务逻辑
+- [x] 盘点历史 CLI wrapper 和 `gui_app.py` 中仍未迁移到 `app/core/` / `app/tools/` 的业务逻辑
 - [x] 把剩余的下载参数组装、运行时环境判断、结果产物定位逻辑继续下沉到 core/service 层
 - [x] 去掉 Web 层对内部私有执行路径的依赖，尤其是类似 `runner._execute_task(...)` 这类非正式调用
 - [x] 确保 CLI 入口继续可用，但角色变成“薄适配器”，不再承载核心业务分支
@@ -69,19 +69,19 @@ TODO：
 
 验证：
 
-- `docs/P0_CORE_BOUNDARY_AUDIT.md` 已补充本轮边界盘点，确认 `myvi_yt_batch.py` 已是薄兼容壳，残留热点主要在 `gui_app.py`、`app/web/main.py`、`youtube_batch.py`
+- `docs/P0_CORE_BOUNDARY_AUDIT.md` 已补充本轮边界盘点，确认历史 CLI wrapper 已是薄兼容壳，残留热点主要在 `gui_app.py`、`app/web/main.py`、`youtube_batch.py`
 - 已新增 `app/core/download_workspace_service.py` 与 `app/core/environment_service.py`，并替换 Web / tools 层的下载 payload、session / 结果定位、运行环境检查逻辑
 - `app/agent/runner.py` 已新增正式 `execute_task(...)` 入口，`app/web/main.py` 不再直接调用私有 `_execute_task(...)`
-- 已新增 `app/core/cli_pipeline_service.py`，`youtube_batch.py` 现在只负责参数解析与调用共享 CLI pipeline；`myvi_yt_batch.py` 继续作为薄兼容 wrapper
+- 已新增 `app/core/cli_pipeline_service.py`，`youtube_batch.py` 现在只负责参数解析与调用共享 CLI pipeline；`youtube_batch_compat.py` 继续作为薄兼容 wrapper
 - `SessionStore` 已新增正式 `last_download_session` 边界，`TaskStore` 已新增 `load_download_session_ref(...)`，`app/core/download_workspace_service.py` 负责协调 SessionStore、TaskResult 和 legacy marker
 - `app/core/download_service.py` 现在会在下载完成后统一写入最近下载会话引用；Web、tools、planner 与 GUI 的关键读取点已切到 shared download session API
 - `python -m py_compile app/core/download_workspace_service.py app/core/environment_service.py app/tools/download_tools.py app/tools/status_tools.py tests/test_download_workspace_api.py` 通过
 - `python -m py_compile app/agent/runner.py app/web/main.py` 通过
-- `python -m py_compile app/core/cli_pipeline_service.py youtube_batch.py myvi_yt_batch.py tests/test_cli_pipeline_service.py` 通过
+- `python -m py_compile app/core/cli_pipeline_service.py youtube_batch.py youtube_batch_compat.py tests/test_cli_pipeline_service.py` 通过
 - `python -m py_compile app/agent/session_store.py app/core/models.py app/core/task_service.py app/core/download_workspace_service.py app/core/download_service.py app/agent/legacy_rule_planner.py app/agent/llm_planner.py app/tools/download_tools.py app/tools/status_tools.py app/web/main.py gui_app.py tests/test_download_session_boundary.py` 通过
 - `python -m unittest discover -s tests -p "test_download_session_boundary.py"` 通过
 - `python -m unittest discover -s tests -p "test_cli_pipeline_service.py"` 通过
-- `python youtube_batch.py --help` 与 `python myvi_yt_batch.py --help` 均可正常输出 CLI 帮助
+- `python youtube_batch.py --help` 与 `python youtube_batch_compat.py --help` 均可正常输出 CLI 帮助
 - 仓库内临时目录冒烟已验证：`build_download_task_payload(...)` 能按当前 session defaults 产出下载 payload，`load_download_results(...)` 能正确聚合下载会话与视频文件
 - 受本地默认 `python` 环境缺少 `fastapi` 影响，`tests/test_download_workspace_api.py`、`test_web_review_api.py`、`test_web_workspace_state.py` 当前无法在此解释器下执行
 

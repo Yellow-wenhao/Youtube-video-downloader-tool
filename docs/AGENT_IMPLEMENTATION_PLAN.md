@@ -30,7 +30,7 @@ Do not start with a chat-only UI that still depends on GUI button automation.
 
 ### Backend source of truth
 
-`myvi_yt_batch.py` already contains the main reusable business capabilities:
+The historical batch CLI wrapper already points at the main reusable business capabilities:
 
 - `search_candidates`
 - `fetch_detail_metadata`
@@ -137,7 +137,7 @@ Create:
 - `app/core/report_service.py`
 - `app/core/download_service.py`
 
-Move or wrap logic from `myvi_yt_batch.py`:
+Move or wrap logic from the historical batch CLI wrapper:
 
 - search functions -> `search_service`
 - metadata functions -> `metadata_service`
@@ -278,7 +278,7 @@ The GUI should consume agent state, not become the agent state.
 
 ## 6. Suggested Function Migration Table
 
-From `myvi_yt_batch.py`:
+From the historical compatibility wrapper:
 
 - `ensure_binary`, `run_command`, `yt_dlp_base`
   - move toward adapter/environment layer
@@ -293,7 +293,7 @@ From `myvi_yt_batch.py`:
 - `download_option_args`, `download_selected`
   - move toward `download_service`
 - `parse_args`, `main`
-  - keep in `myvi_yt_batch.py` as compatibility wrapper
+  - keep in `youtube_batch_compat.py` as compatibility wrapper
 
 From `gui_app.py`:
 
@@ -350,6 +350,6 @@ If implementation starts now, the safest first coding slice is:
 2. add `app/core/models.py`
 3. extract `yt_dlp_base`, `ensure_binary`, `run_command` into adapters
 4. extract `search_candidates` and `fetch_detail_metadata`
-5. make `myvi_yt_batch.py` call the extracted services
+5. make `youtube_batch_compat.py` call the extracted services
 
 This gives the project a real architectural seam without forcing a risky full rewrite.

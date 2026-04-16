@@ -22,9 +22,10 @@ The current goal is not to build a fully autonomous system. The goal is to build
 - `gui_app.py`
   - Legacy desktop GUI entrypoint.
   - Still useful as migration reference, but no longer the preferred product shell.
-- `myvi_yt_batch.py`
-  - Current backend script entrypoint.
-  - Contains search, metadata fetch, filtering, export, and download logic.
+- `youtube_batch.py`
+  - Current generic CLI entrypoint.
+- `youtube_batch_compat.py`
+  - Thin compatibility wrapper kept for migration continuity.
 
 These two files are the current sources of truth. New architecture should be extracted from them gradually rather than rewritten all at once.
 
@@ -80,7 +81,7 @@ The agent should require confirmation before:
 
 - Do not make the agent depend on GUI widget state as the primary execution path.
 - Do not duplicate business logic in GUI and web layers.
-- Move logic out of `gui_app.py` and `myvi_yt_batch.py` incrementally into new modules.
+- Move logic out of `gui_app.py` and old compatibility wrappers incrementally into new modules.
 - Preserve the existing CLI behavior unless a deliberate migration step says otherwise.
 - Keep Windows compatibility as a first-class constraint.
 
@@ -115,7 +116,7 @@ Suggested responsibilities:
 
 ## 8. Current Function Migration Guideline
 
-Likely extraction sources from `myvi_yt_batch.py`:
+Likely extraction sources from the historical batch CLI:
 
 - search-related functions -> `search_service`
 - metadata functions -> `metadata_service`

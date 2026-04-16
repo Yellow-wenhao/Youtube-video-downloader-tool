@@ -46,7 +46,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Fixed startup duplicate-window issue in packaged builds caused by wrong interpreter resolution.
-- Fixed packaged app backend script resolution (`myvi_yt_batch.py` bundled with app).
+- Fixed packaged app backend script resolution (historical batch CLI wrapper bundled with app).
 - Fixed CSV Chinese display compatibility via UTF-8 BOM export.
 - Fixed multiple progress display and queue state synchronization issues.
 - Fixed repeated failure/retry edge behaviors and improved concise failure logging.
@@ -57,4 +57,3 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 [Unreleased]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.0
-

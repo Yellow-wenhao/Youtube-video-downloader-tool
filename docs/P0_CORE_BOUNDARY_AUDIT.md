@@ -2,11 +2,11 @@
 
 本审计用于完成 `docs/AGENT_TODO.md` 中的第一项：
 
-- 盘点 `myvi_yt_batch.py` 和 `gui_app.py` 中仍未迁移到 `app/core/` / `app/tools/` 的业务逻辑
+- 盘点历史 CLI wrapper 和 `gui_app.py` 中仍未迁移到 `app/core/` / `app/tools/` 的业务逻辑
 
 结论先行：
 
-1. `myvi_yt_batch.py` 现在已经是薄兼容壳，本身几乎不再承载核心业务逻辑。
+1. 历史 CLI wrapper 现在已经是薄兼容壳，本身几乎不再承载核心业务逻辑。
 2. 真正仍需收口的残留逻辑主要集中在 `gui_app.py`。
 3. 除了 GUI，`app/web/main.py` 里也还存在一部分应继续下沉到 service 层的业务编排逻辑。
 4. 旧脚本形态的业务兼容入口现在更接近 `youtube_batch.py`，后续若继续做“CLI 薄适配器收口”，应把它一并视为盘点对象。
@@ -39,17 +39,17 @@
 
 ---
 
-## 2. `myvi_yt_batch.py` 现状
+## 2. `youtube_batch_compat.py` 现状
 
 现状：
 
-- `myvi_yt_batch.py` 仅做兼容转发，直接调用 `youtube_batch.main(...)`
+- `youtube_batch_compat.py` 仅做兼容转发，直接调用 `youtube_batch.main(...)`
 - 它本身不再包含搜索、筛选、下载、报告等核心逻辑
 
 结论：
 
-- `myvi_yt_batch.py` 本身不构成当前 P0 的主要边界风险
-- TODO 中对 `myvi_yt_batch.py` 的历史表述可以保留，但实际执行上应把注意力转向：
+- `youtube_batch_compat.py` 本身不构成当前 P0 的主要边界风险
+- TODO 中对历史 CLI wrapper 的表述可以保留语义，但实际执行上应把注意力转向：
   - `gui_app.py`
   - `app/web/main.py`
   - `youtube_batch.py` 这个旧脚本兼容入口
@@ -171,7 +171,7 @@
 
 ## 4. `app/web/main.py` 当前仍存在的 service 缺口
 
-虽然本轮 TODO 盘点目标写的是 `myvi_yt_batch.py` / `gui_app.py`，但实际下一步落地前，必须同时注意 Web 层的这几类残留编排：
+虽然本轮 TODO 盘点目标最初写的是历史 CLI wrapper / `gui_app.py`，但实际下一步落地前，必须同时注意 Web 层的这几类残留编排：
 
 ### A. Web 直接使用非正式 runner 执行路径
 

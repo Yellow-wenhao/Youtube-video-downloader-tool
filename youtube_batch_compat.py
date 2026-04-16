@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python3
-"""Backward-compatible wrapper for the generic YouTube batch pipeline."""
+"""Compatibility wrapper for the generic YouTube batch pipeline."""
 
 from __future__ import annotations
 
