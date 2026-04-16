@@ -8,6 +8,9 @@ build/
 dist/
 .tmp_test_runs/
 gui_settings.local.json
+downloads/
+video_info/
+gui_app.py.bak_mojibake
 myvi_dataset/
 myvi_downloads/
 test_dataset/

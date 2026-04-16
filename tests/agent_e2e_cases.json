@@ -1,0 +1,59 @@
+[
+  {
+    "id": "search_only_cn",
+    "request": "帮我找 2024 年后的 Tesla Model 3 review，先筛 20 个，不要下载",
+    "expected_intent": "search_pipeline",
+    "expected_download": false,
+    "expected_search_queries_min": 1,
+    "notes": "基础中文搜索计划，不触发下载步骤。"
+  },
+  {
+    "id": "search_then_confirm_download",
+    "request": "帮我找 Python async 教程，先筛 30 个，确认后下载 1080p",
+    "expected_intent": "search_pipeline",
+    "expected_download": true,
+    "expected_confirmation": true,
+    "expected_max_height": 1080,
+    "notes": "应生成下载步骤，并保留确认边界。"
+  },
+  {
+    "id": "audio_only_task",
+    "request": "搜索 Hans Zimmer live，筛 15 个，只要音频，导出 mp3",
+    "expected_intent": "search_pipeline",
+    "expected_download_mode": "audio",
+    "expected_audio_format": "mp3",
+    "notes": "验证音频模式归一化。"
+  },
+  {
+    "id": "status_lookup",
+    "request": "查看当前任务状态",
+    "expected_intent": "get_task_status",
+    "expected_step_count": 1,
+    "notes": "应直接读取状态，不启动搜索流水线。"
+  },
+  {
+    "id": "runtime_check",
+    "request": "检查一下 yt-dlp 和 ffmpeg 环境",
+    "expected_intent": "check_runtime_env",
+    "expected_step_count": 1,
+    "notes": "应只执行环境检查工具。"
+  },
+  {
+    "id": "retry_failed",
+    "request": "重试上次失败的下载",
+    "expected_intent": "retry_failed_downloads",
+    "expected_confirmation": true,
+    "expected_step_count": 1,
+    "notes": "应映射到失败下载重试。"
+  },
+  {
+    "id": "year_filter_and_video_mode",
+    "request": "找 2023 到 2025 的 iPhone camera comparison，下载视频，不要音频",
+    "expected_intent": "search_pipeline",
+    "expected_download": true,
+    "expected_include_audio": false,
+    "expected_year_from": 2023,
+    "expected_year_to": 2025,
+    "notes": "验证年份范围和 include_audio 归一化。"
+  }
+]
