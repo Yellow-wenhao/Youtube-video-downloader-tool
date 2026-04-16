@@ -27,7 +27,8 @@ from app.gui.agent_bridge import AgentBridge
 import ui_theme
 
 
-SETTINGS_FILE = Path(__file__).with_name("gui_settings.json")
+SETTINGS_FILE = Path(__file__).with_name("gui_settings.local.json")
+LEGACY_SETTINGS_FILE = Path(__file__).with_name("gui_settings.json")
 
 
 @dataclass
@@ -5990,11 +5991,12 @@ class MainWindow(QtWidgets.QMainWindow):
     def _load_settings(self) -> None:
         self._set_combo_text(self.cb_workdir, str(Path("./video_info").resolve()))
         self._set_combo_text(self.cb_downloaddir, str(Path("./downloads").resolve()))
-        if not SETTINGS_FILE.exists():
+        settings_path = SETTINGS_FILE if SETTINGS_FILE.exists() else LEGACY_SETTINGS_FILE
+        if not settings_path.exists():
             self._update_config_summary()
             return
         try:
-            data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            data = json.loads(settings_path.read_text(encoding="utf-8"))
         except Exception:
             return
         work_hist = data.get("workdir_history", [])

@@ -7,6 +7,7 @@ venv/
 build/
 dist/
 .tmp_test_runs/
+gui_settings.json
 gui_settings.local.json
 downloads/
 video_info/

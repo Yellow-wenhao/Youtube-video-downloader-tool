@@ -272,7 +272,7 @@ TODO：
 - [main.py](D:/YTBDLP/app/web/main.py) 已新增 `/api/bootstrap`，前端首次加载会从当前机器动态获取推荐 workdir 和默认下载目录
 - [index.html](D:/YTBDLP/app/web/static/index.html) 与 [workspace.js](D:/YTBDLP/app/web/static/workspace.js) 已去掉前端 `Workdir` 硬编码，首次打开页面不再显示开发机绝对路径
 - [runner.py](D:/YTBDLP/app/agent/runner.py) 的 CLI 默认 `--workdir` 已改为 shared default resolver，不再使用仓库内固定目录
-- [gui_settings.json](D:/YTBDLP/gui_settings.json) 已清理为通用示例型默认值，不再保留个人历史目录
+- `gui_settings.json` 已降级为 legacy 兼容读取来源；GUI 运行时默认写入本地 `gui_settings.local.json`，不再把个人 GUI 配置跟踪进仓库
 - [.gitignore](D:/YTBDLP/.gitignore) 已补 `build/`、`dist/`、`.tmp_test_runs/` 等忽略项，降低把本机构建/测试产物继续提交进仓库的风险
 
 ---
