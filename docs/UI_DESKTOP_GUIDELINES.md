@@ -1,61 +1,104 @@
-# YouTube-like Desktop UI Guidelines (For This Project)
+# Desktop UI Guidelines
 
-## 1. Product Intent
+## 1. Product Direction
 
-- This app is a downloader tool, not a content platform.
-- UI style should borrow YouTube Desktop rhythm: dark, clean, task-oriented.
-- Priority is always: find video -> download -> observe progress -> manage results.
+- This product is a desktop workflow tool for YouTube search, review, download, and agent-assisted orchestration.
+- The interface should feel like a mature desktop control center, not a dark media site and not a developer-only form dump.
+- Visual priority order:
+  1. Readability
+  2. Task hierarchy
+  3. Confirmation safety
+  4. Operational confidence
 
-## 2. Visual Tokens
+## 2. Theme Strategy
 
-- Background base: `#0F0F0F`
-- Elevated surface 1: `#181818`
-- Elevated surface 2: `#212121`
-- Border: `#303030`
-- Primary text: `#F1F1F1`
-- Secondary text: `#AAAAAA`
-- Accent red (primary action): `#FF3B30`
-- Success: `#22C55E`
-- Info: `#3B82F6`
-- Warning: `#F59E0B`
-- Error: `#EF4444`
+- Default to a light productivity theme.
+- Preserve clear contrast between page background, card background, interactive background, and status background.
+- Avoid near-black surfaces, low-contrast gray borders, and overly saturated large-area accents.
 
-## 3. Layout Rules
+## 3. Four-Level Surface System
 
-- Top area contains task context and real-time status.
-- Core body uses tabs for:
-  - Task configuration
-  - Queue / operation center
-  - Result browsing
-- Video card area must keep strong contrast in dark mode.
-- Action buttons use red only for primary actions to preserve visual hierarchy.
+- Page background
+  - Used for app shell and outer whitespace
+  - Should visually recede
+- Card background
+  - Used for grouped sections, overview panels, review cards, and workspaces
+  - Must be clearly separated from page background
+- Interactive background
+  - Used for inputs, list panes, logs, embedded review blocks, and button surfaces
+  - Must feel one level deeper than card background
+- Status background
+  - Used for badges, chips, alerts, and semantic notifications
+  - Must stay compact and never replace layout hierarchy
 
-## 4. Interaction Rules
+## 4. Typography Rules
 
-- Any long-running operation must expose progress states.
-- Queue states should be readable at a glance:
-  - pending
-  - running
-  - success
-  - failed
-- Failure states should include retry paths.
-- Download completion should show visible feedback and support opening folder.
+- Main title: strong, product-level, visually stable.
+- Section title: heavier than body copy and consistent across tabs.
+- Body text: prioritize readability over compactness.
+- Helper text: secondary color, but still clearly readable.
+- Never let primary labels or placeholders appear vertically clipped.
 
-## 5. Resolution and Desktop Adaptation
+## 5. Spacing and Container Rules
 
-- Designed for desktop first.
-- Must remain readable under 1080p, 2K, and 4K screens.
-- Ensure high-DPI usability at 100% / 125% / 150% scale.
+- Use comfortable card padding for desktop surfaces.
+- Avoid cramped side-by-side panes when content includes:
+  - logs
+  - plan lists
+  - confirmation steps
+  - long labels
+  - review summaries
+- Prefer increasing panel height, internal padding, or width ratio before truncating content.
+- Inner scrollable areas must remain visually closed inside their parent cards.
 
-## 6. Implementation Mapping
+## 6. Interaction Hierarchy
 
-- Theme tokens and styles are centralized in `ui_theme.py`.
-- `gui_app.py` only references style helpers and avoids hard-coded hex colors.
-- New UI changes should update token helpers first, then UI widgets.
+- One clear primary CTA per screen or module.
+- Secondary actions must look coordinated, not weak or random.
+- Template chips, status chips, and review chips should use a lighter visual weight than action buttons.
+- Focus state should improve clarity, not create noisy or awkward shapes.
 
-## 7. Next Iteration (Recommended)
+## 7. Key Page Patterns
 
-- Add a dedicated left navigation rail (Browse / Queue / Downloaded / Failed / Settings).
-- Add download toast notifications with click-to-open-folder action.
-- Split video detail controls into a right-side panel for YouTube-like flow.
-- Add subtle transitions (150ms~250ms) for tab/card state changes.
+### Agent Workspace
+
+- Must present a complete loop:
+  - input request
+  - plan preview
+  - confirmation boundary
+  - execution state
+  - result or log
+- Action controls should live in a dedicated strip, not float between cards.
+- Empty states should still look intentional.
+
+### Queue / Task Area
+
+- Agent tasks and manual tasks must be visually distinct at first glance.
+- Task card status, next action, and available operation should be scannable within 2-3 seconds.
+
+### Video Review Area
+
+- Should feel like a review cockpit.
+- Thumbnail, status, semantic score, similarity warning, and decision reason must form a clear reading rhythm.
+- Low-similarity or manual-review states must stand out without turning the whole page visually noisy.
+
+## 8. Anti-Patterns
+
+- Dark-on-dark or gray-on-gray productivity surfaces
+- Panels that cut off text or bottom borders
+- Selected states that overlap text or create odd pills/ovals
+- Buttons with inconsistent radius, weight, or hierarchy
+- Placeholder text used as the only label for complex actions
+
+## 9. Implementation Rules
+
+- Centralize visual tokens and shared component styles in `ui_theme.py`.
+- Keep page-level composition and sizing changes in `gui_app.py`.
+- When polishing a page, adjust both:
+  - local layout geometry
+  - global semantic styling
+- Any future visual change must be checked against:
+  - readability
+  - container fit
+  - hierarchy clarity
+  - border visibility

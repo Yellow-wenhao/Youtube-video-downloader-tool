@@ -4,6 +4,10 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+build/
+dist/
+.tmp_test_runs/
+gui_settings.local.json
 myvi_dataset/
 myvi_downloads/
 test_dataset/

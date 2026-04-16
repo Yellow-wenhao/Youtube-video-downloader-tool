@@ -1,0 +1,569 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>YTBDLP Web Agent Workspace</title>
+  <link rel="stylesheet" href="/static/workspace.css" />
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="eyebrow">Web Agent</div>
+      <h1>YTBDLP 下载工作区</h1>
+      <p>创建任务，审核候选，开始下载，然后查看结果。页面只保留用户真正要做的事，不再让内部产物和诊断信息占据主视图。</p>
+    </section>
+
+    <section class="layout">
+      <aside class="rail">
+        <section class="card composer-card">
+          <div class="head">
+            <h2>任务输入</h2>
+            <div class="subtle">把主要输入收敛到自然语言请求，连接细节和模型切换放进高级区域，减少首次使用的阻力。</div>
+          </div>
+          <div class="composer-intro">
+            <div>
+              <strong>先描述你要下载什么</strong>
+              <div class="subtle">常规流程只需要工作区、API Key 和自然语言请求。Provider、模型、Base URL 放到“高级连接设置”里按需调整。</div>
+            </div>
+            <span class="pill tone-info">主操作: 运行任务</span>
+          </div>
+            <div class="grid2">
+              <div class="field">
+                <label for="workdir">Workdir</label>
+                <input id="workdir" placeholder="首次加载时会自动填入当前系统推荐工作区" />
+              <div class="note">任务记录、审核结果和下载会话会统一保存在这个工作区。</div>
+            </div>
+            <div class="field">
+              <label for="apiKey">API Key</label>
+              <input id="apiKey" type="password" placeholder="输入 API Key" />
+              <div class="note">API Key 保留在当前页面会话中，用于测试连接与运行任务。</div>
+            </div>
+              <div class="field span2">
+                <label for="request">User Request</label>
+                <textarea id="request" placeholder="例如：帮我找 2024 年后的 Tesla Model 3 review，先筛选候选视频，审核后再下载 5 个高质量视频"></textarea>
+                <div class="note">写清主题、时间范围、数量要求，以及是否需要人工确认，Agent 会按这个目标生成任务。</div>
+              </div>
+            </div>
+            <section class="request-templates">
+              <div class="section">
+                <h3>快速模板</h3>
+                <span class="pill" id="requestTemplateHint">点击填入后再改主题即可</span>
+              </div>
+              <div class="template-chips" id="requestTemplateChips">
+                <button class="chip-btn active" type="button" data-request-template="review">先筛选再下载</button>
+                <button class="chip-btn" type="button" data-request-template="compare">对比评测</button>
+                <button class="chip-btn" type="button" data-request-template="clips">素材剪辑</button>
+                <button class="chip-btn" type="button" data-request-template="audio">只要音频</button>
+              </div>
+              <div class="request-template-grid" id="requestTemplateGrid">
+                <article class="request-template-card active" data-request-template-card="review">
+                  <div class="request-template-head">
+                    <strong>审核型下载</strong>
+                    <span class="pill tone-info">推荐起手</span>
+                  </div>
+                  <p>适合大多数任务，先让 Agent 搜索和筛选候选视频，再由你审核后开始下载。</p>
+                  <div class="request-template-example">帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。</div>
+                  <div class="mini-actions">
+                    <button class="btn2" type="button" data-request-template-apply="帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。">填入这个模板</button>
+                  </div>
+                </article>
+                <article class="request-template-card" data-request-template-card="compare">
+                  <div class="request-template-head">
+                    <strong>对比评测</strong>
+                    <span class="pill">适合横评</span>
+                  </div>
+                  <p>适合产品对比、车型横评、工具评测等需要限定时间范围和结果数量的任务。</p>
+                  <div class="request-template-example">帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。</div>
+                  <div class="mini-actions">
+                    <button class="btn2" type="button" data-request-template-apply="帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。">填入这个模板</button>
+                  </div>
+                </article>
+                <article class="request-template-card" data-request-template-card="clips">
+                  <div class="request-template-head">
+                    <strong>素材剪辑</strong>
+                    <span class="pill">适合找 B-roll</span>
+                  </div>
+                  <p>适合收集某个主题的可用素材，强调画面质量、时长和下载数量。</p>
+                  <div class="request-template-example">帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。</div>
+                  <div class="mini-actions">
+                    <button class="btn2" type="button" data-request-template-apply="帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。">填入这个模板</button>
+                  </div>
+                </article>
+                <article class="request-template-card" data-request-template-card="audio">
+                  <div class="request-template-head">
+                    <strong>只保留音频</strong>
+                    <span class="pill">适合播客 / 访谈</span>
+                  </div>
+                  <p>适合访谈、播客、演讲等只关心音频内容的任务，后续可配合设置页切到音频模式。</p>
+                  <div class="request-template-example">帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。</div>
+                  <div class="mini-actions">
+                    <button class="btn2" type="button" data-request-template-apply="帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。">填入这个模板</button>
+                  </div>
+                </article>
+              </div>
+            </section>
+            <details class="advanced-panel" id="taskInputAdvanced">
+            <summary>
+              <div class="advanced-copy">
+                <strong>高级连接设置</strong>
+                <span class="subtle" id="advancedSummaryText">默认 provider / 默认模型 / 默认 URL</span>
+              </div>
+              <span class="advanced-trigger">展开</span>
+            </summary>
+            <div class="advanced-panel-body">
+              <div class="grid2">
+                <div class="field span2">
+                  <label for="provider">Provider</label>
+                  <select id="provider">
+                    <option value="openai">openai</option>
+                    <option value="openrouter">openrouter</option>
+                    <option value="deepseek">deepseek</option>
+                    <option value="moonshot">moonshot</option>
+                    <option value="aliyun_bailian">aliyun_bailian</option>
+                    <option value="custom">手动填写 provider</option>
+                  </select>
+                  <input id="providerCustom" placeholder="输入自定义 provider，例如 siliconflow" hidden />
+                  <div class="note" id="providerHint">预置 provider 会自动带出推荐 URL 和模型；如需兼容平台可切换到手动填写。</div>
+                </div>
+                <div class="field span2">
+                  <label for="baseUrl">Base URL</label>
+                  <input id="baseUrl" placeholder="https://api.openai.com/v1" />
+                </div>
+                <div class="field">
+                  <label for="modelSelect">Model</label>
+                  <select id="modelSelect"></select>
+                  <input id="modelManual" placeholder="手动输入模型名称，例如 gpt-5.4" hidden />
+                </div>
+                <div class="field">
+                  <label>连接检查</label>
+                  <div class="advanced-actions">
+                    <button class="btn2" id="btnTest" type="button">测试连接</button>
+                  </div>
+                  <div class="note">只有在切换 provider、模型或 Base URL 后，才需要手动做连接检查。</div>
+                </div>
+                <div class="field span2">
+                  <div class="note" id="modelSuggestion">建议模型: -</div>
+                </div>
+              </div>
+            </div>
+          </details>
+          <div class="actions top-actions">
+            <button class="btn" id="btnRun" type="button">运行任务</button>
+            <button class="btn2" id="btnResume" type="button">继续当前任务</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="head">
+            <h2>任务队列</h2>
+            <div class="subtle">聚焦当前任务、待确认任务和最近完成任务。</div>
+          </div>
+          <div class="queue-tools">
+            <div class="queue-pills" id="queuePills"></div>
+            <div class="grid2">
+              <div class="field">
+                <label for="taskStatusFilter">状态范围</label>
+                <select id="taskStatusFilter">
+                  <option value="">全部任务</option>
+                  <option value="planned">待执行</option>
+                  <option value="running">运行中</option>
+                  <option value="awaiting_confirmation">等待确认</option>
+                  <option value="succeeded">已完成</option>
+                  <option value="failed">失败</option>
+                  <option value="needs_attention">异常 / 待处理</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="taskSort">排序</label>
+                <select id="taskSort">
+                  <option value="updated_desc">最近更新</option>
+                  <option value="created_desc">最近创建</option>
+                  <option value="status_grouped">按状态分组</option>
+                </select>
+              </div>
+              <div class="field span2">
+                <label for="taskSearch">关键词</label>
+                <input id="taskSearch" placeholder="筛选任务名 / task_id / intent / 状态信息" />
+              </div>
+            </div>
+            <div class="mini-actions">
+              <button class="btn2" id="btnToggleAttention" type="button">仅看异常 / 待确认</button>
+              <button class="btn2" id="btnReloadTasks" type="button">刷新任务列表</button>
+            </div>
+          </div>
+          <div class="queue" id="taskList">
+            <div class="spacer" id="taskListSpacer">
+              <div class="window" id="taskListWindow"></div>
+            </div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="workspace-wrap">
+        <section class="card workspace">
+          <header class="w-head">
+            <div class="w-title">
+              <div class="eyebrow compact-eyebrow">当前任务</div>
+              <h2 id="workspaceTitle">未选择任务</h2>
+              <div class="w-sub" id="workspaceSubtitle">运行或选择一个任务后，这里会显示当前阶段、下载进度、日志以及下载入口。</div>
+            </div>
+            <div class="pills">
+              <span class="pill tone-info" id="statusPill">阶段: 未开始</span>
+              <span class="pill" id="taskIdPill">Task: -</span>
+            </div>
+          </header>
+          <div class="workspace-actions-bar" id="workspaceActionsBar"></div>
+
+          <div class="tabs">
+            <button class="tab active" data-tab="status" type="button">状态</button>
+            <button class="tab" data-tab="review" type="button">审核</button>
+            <button class="tab" data-tab="results" type="button">结果</button>
+            <button class="tab" data-tab="logs" type="button">日志</button>
+            <button class="tab" data-tab="settings" type="button">设置</button>
+          </div>
+
+          <section class="panel active" id="panel-status">
+            <div class="scroll">
+              <div class="status-grid">
+                <div class="stack">
+                  <section class="inner">
+                    <div class="section">
+                      <h3>任务阶段</h3>
+                      <span class="pill" id="updatedPill">最近更新: -</span>
+                    </div>
+                    <div class="stage-callout">
+                      <div class="stage-row">
+                        <span class="pill tone-info" id="workspaceStagePill">任务准备中</span>
+                      </div>
+                      <div class="message" id="primaryMessage">等待任务开始。</div>
+                    </div>
+                    <div class="progress">
+                      <div class="progress-meta">
+                        <strong id="overallTitle">等待任务开始</strong>
+                        <span id="overallValue">0%</span>
+                      </div>
+                      <div class="track"><div class="fill" id="overallFill"></div></div>
+                      <div class="subtle" id="overallDetail">尚未开始执行。</div>
+                    </div>
+                    <div class="metrics" id="metricGrid">
+                      <article class="metric">
+                        <div class="k">当前步骤</div>
+                        <div class="v">-</div>
+                        <div class="d">暂无步骤信息</div>
+                      </article>
+                    </div>
+                  </section>
+
+                  <div id="confirmWrap"></div>
+                </div>
+
+                <div class="stack">
+                  <section class="inner">
+                    <div class="section">
+                      <h3>下载实时进度</h3>
+                      <span class="pill" id="downloadPhase">未开始</span>
+                    </div>
+                    <div id="downloadBox" class="empty">当前还没有下载进度。开始下载后，这里会显示百分比、速度、当前视频以及最近更新时间。</div>
+                  </section>
+
+                  <section class="inner">
+                    <div class="section">
+                      <h3>已下载视频</h3>
+                      <span class="pill" id="entryStatusPill">目标目录</span>
+                    </div>
+                    <div id="entryBox" class="empty">任务完成后，这里会提供打开下载目录的唯一入口。</div>
+                  </section>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-review">
+            <div class="section panel-head">
+              <div>
+                <h3>视频审核与勾选下载</h3>
+                <div class="subtle">保留要下载的视频，去掉不需要的候选。</div>
+              </div>
+              <div class="mini-actions">
+                <span class="pill" id="reviewStatusPill">未加载</span>
+              </div>
+            </div>
+            <div class="scroll">
+              <section class="inner review-shell">
+                <div class="review-topbar">
+                  <div class="review-pills" id="reviewSummaryPills"></div>
+                  <div class="review-actions">
+                    <button class="btn" id="btnStartSelectedDownload" type="button">开始下载已勾选视频</button>
+                    <button class="btn2" id="btnReviewSelectRecommended" type="button">只保留 Agent 推荐</button>
+                    <button class="btn2" id="btnReviewSelectPage" type="button">本页全选</button>
+                    <button class="btn2" id="btnReviewClearPage" type="button">本页清空</button>
+                  </div>
+                </div>
+                <div class="grid2 review-filters">
+                  <div class="field">
+                    <label for="reviewSearch">关键词</label>
+                    <input id="reviewSearch" placeholder="筛选标题 / 频道 / 链接 / 摘要" />
+                  </div>
+                  <div class="field">
+                    <label for="reviewScope">范围</label>
+                    <select id="reviewScope">
+                      <option value="all">全部候选</option>
+                      <option value="selected">已选中</option>
+                      <option value="agent_selected">Agent 推荐</option>
+                      <option value="manual_review">需复核</option>
+                      <option value="low_similarity">低相似</option>
+                      <option value="modified">手动改动</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="reviewSort">排序</label>
+                    <select id="reviewSort">
+                      <option value="recommended">推荐优先</option>
+                      <option value="vector_desc">语义分数高到低</option>
+                      <option value="date_desc">上传日期新到旧</option>
+                      <option value="duration_desc">时长长到短</option>
+                      <option value="title_asc">标题 A-Z</option>
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label for="reviewPageSize">每页显示</label>
+                    <select id="reviewPageSize">
+                      <option value="8">8 张卡</option>
+                      <option value="12" selected>12 张卡</option>
+                      <option value="16">16 张卡</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="review-meta">
+                  <div class="subtle" id="reviewStatus">选择一个任务后，这里会显示当前筛选出的候选视频。</div>
+                  <div class="mini-actions">
+                    <button class="btn2" id="btnReviewPrev" type="button">上一页</button>
+                    <button class="btn2" id="btnReviewNext" type="button">下一页</button>
+                    <span class="pill" id="reviewPageLabel">第 0/0 页</span>
+                  </div>
+                </div>
+                <div class="review-grid" id="reviewList">
+                  <div class="empty-center">选择一个任务后，这里会显示当前筛选出的候选视频。</div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-results">
+            <div class="section panel-head">
+              <div>
+                <h3>已下载视频</h3>
+                <div class="subtle">优先展示最近下载结果和视频封面，直接打开视频或目录，不让内部产物占据主视图。</div>
+              </div>
+              <div class="mini-actions">
+                <span class="pill" id="resultsStatusPill">未加载</span>
+                <button class="btn2" id="btnRefreshResults" type="button">刷新结果</button>
+              </div>
+            </div>
+            <div class="scroll">
+              <section class="inner results-shell">
+                <div class="results-summary" id="resultsSummary"></div>
+                <section class="results-controls">
+                  <div class="section">
+                    <h3>结果筛选与排序</h3>
+                    <div class="mini-actions">
+                      <span class="pill tone-info" id="resultsFilterStatusPill">全部会话</span>
+                      <div class="results-view-switch" id="resultsViewSwitch">
+                        <button class="chip-btn active" type="button" data-results-view="gallery">封面预览</button>
+                        <button class="chip-btn" type="button" data-results-view="compact">紧凑列表</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="grid2 review-filters results-filters">
+                    <div class="field">
+                      <label for="resultsSearch">关键词</label>
+                      <input id="resultsSearch" placeholder="筛选会话名、视频标题、视频 ID、关联任务" />
+                    </div>
+                    <div class="field">
+                      <label for="resultsScope">范围</label>
+                      <select id="resultsScope">
+                        <option value="all">全部会话</option>
+                        <option value="failed">只看有失败项</option>
+                        <option value="retryable">只看可重试</option>
+                        <option value="linked_task">只看有关联任务</option>
+                        <option value="success_only">只看全部成功</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="resultsSort">排序</label>
+                      <select id="resultsSort">
+                        <option value="recent_desc">最近更新时间新到旧</option>
+                        <option value="failed_desc">失败项多到少</option>
+                        <option value="video_desc">视频数多到少</option>
+                        <option value="title_asc">会话名 A-Z</option>
+                        <option value="recent_asc">最近更新时间旧到新</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label for="resultsPinLatest">最近会话</label>
+                      <label class="checkbox-inline">
+                        <input id="resultsPinLatest" type="checkbox" checked />
+                        <span>固定最近会话置顶</span>
+                      </label>
+                    </div>
+                  </div>
+                </section>
+                <div class="results-list" id="resultsList">
+                  <div class="empty-center">完成下载后，这里会展示最近下载会话和可直接打开的视频。</div>
+                </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-logs">
+            <div class="section panel-head">
+              <h3>当前任务日志</h3>
+              <div class="mini-actions">
+                <span class="pill" id="logsCount">0 行</span>
+                <button class="btn2" id="btnRefreshLogs" type="button">刷新日志</button>
+              </div>
+            </div>
+            <div class="logs" id="logList">
+              <div class="empty-center">当前没有日志。选择一个任务后，这里会显示任务日志尾部和下载 stdout 解析结果。</div>
+            </div>
+          </section>
+
+          <section class="panel" id="panel-settings">
+            <form class="scroll" id="settingsForm">
+              <section class="inner settings-card">
+                <div class="section"><h3>下载默认设置</h3></div>
+                <div class="subtle">这些设置会保存到当前 workdir 的 <code>.agent/session.json</code> 默认项中，后续 run / resume 会自动读取。</div>
+                <section class="settings-overview" aria-live="polite">
+                  <div class="settings-overview-copy">
+                    <div class="settings-overview-title">当前默认策略</div>
+                    <div class="settings-overview-text" id="settingsSummaryText">优先保存到默认目录，使用视频模式下载。</div>
+                  </div>
+                  <div class="settings-overview-meta">
+                    <div class="settings-overview-row">
+                      <span>媒体质量</span>
+                      <strong id="settingsMediaSummaryText">自动选择</strong>
+                    </div>
+                    <div class="settings-overview-row">
+                      <span>高级行为</span>
+                      <strong id="settingsAdvancedSummaryText">使用标准并发与清理策略</strong>
+                    </div>
+                  </div>
+                </section>
+
+                <section class="settings-block">
+                  <div class="settings-block-head">
+                    <div>
+                      <h4>常用设置</h4>
+                      <p>先确定下载位置和下载模式，常用项保持默认即可快速开始。</p>
+                    </div>
+                  </div>
+                  <div class="grid2 settings-core-grid">
+                    <div class="field span2">
+                      <label for="settingDownloadDir">下载目录</label>
+                      <input id="settingDownloadDir" />
+                    </div>
+                    <div class="field">
+                      <label for="settingDownloadMode">下载模式</label>
+                      <select id="settingDownloadMode">
+                        <option value="video">视频</option>
+                        <option value="audio">音频</option>
+                      </select>
+                    </div>
+                    <div class="field" id="fieldSettingMaxHeight">
+                      <label for="settingMaxHeight">最大分辨率高度</label>
+                      <input id="settingMaxHeight" type="number" min="0" step="1" placeholder="例如 1080；留空表示不限制" />
+                    </div>
+                    <div class="field span2" id="fieldSettingIncludeAudio">
+                      <label for="settingIncludeAudio">音频策略</label>
+                      <div class="check">
+                        <input id="settingIncludeAudio" type="checkbox" />
+                        <span>视频模式下包含音频轨</span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <details class="settings-section" open>
+                  <summary>
+                    <div class="settings-section-heading">
+                      <strong>媒体质量设置</strong>
+                      <span>控制封装格式、音频格式和输出质量。</span>
+                    </div>
+                    <span class="settings-section-summary" id="settingsMediaSummaryBadge">自动选择</span>
+                  </summary>
+                  <div class="grid2 settings-section-grid">
+                    <div class="field" id="fieldSettingVideoContainer">
+                      <label for="settingVideoContainer">视频封装格式</label>
+                      <select id="settingVideoContainer">
+                        <option value="auto">auto</option>
+                        <option value="mp4">mp4</option>
+                        <option value="mkv">mkv</option>
+                        <option value="webm">webm</option>
+                      </select>
+                    </div>
+                    <div class="field" id="fieldSettingAudioFormat">
+                      <label for="settingAudioFormat">音频格式</label>
+                      <select id="settingAudioFormat">
+                        <option value="best">best</option>
+                        <option value="mp3">mp3</option>
+                        <option value="m4a">m4a</option>
+                        <option value="aac">aac</option>
+                        <option value="flac">flac</option>
+                        <option value="wav">wav</option>
+                      </select>
+                    </div>
+                    <div class="field" id="fieldSettingAudioQuality">
+                      <label for="settingAudioQuality">音频质量</label>
+                      <input id="settingAudioQuality" type="number" min="0" step="1" placeholder="例如 192；留空表示默认" />
+                    </div>
+                  </div>
+                </details>
+
+                <details class="settings-section">
+                  <summary>
+                    <div class="settings-section-heading">
+                      <strong>高级下载行为</strong>
+                      <span>需要时再展开调整并发、SponsorBlock 和清理策略。</span>
+                    </div>
+                    <span class="settings-section-summary" id="settingsAdvancedSummaryBadge">标准并发</span>
+                  </summary>
+                  <div class="grid2 settings-section-grid">
+                    <div class="field">
+                      <label for="settingConcurrentVideos">并发视频数</label>
+                      <input id="settingConcurrentVideos" type="number" min="1" step="1" />
+                    </div>
+                    <div class="field">
+                      <label for="settingConcurrentFragments">分片并发数</label>
+                      <input id="settingConcurrentFragments" type="number" min="1" step="1" />
+                    </div>
+                    <div class="field span2">
+                      <label for="settingSponsorBlockRemove">SponsorBlock Remove</label>
+                      <input id="settingSponsorBlockRemove" placeholder="例如 sponsor,intro,outro；留空表示关闭" />
+                    </div>
+                    <div class="field span2">
+                      <label for="settingCleanVideo">清理模式</label>
+                      <div class="check">
+                        <input id="settingCleanVideo" type="checkbox" />
+                        <span>启用更干净的视频输出策略</span>
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              </section>
+              <div class="section settings-footer">
+                <div class="subtle" id="settingsStatus">尚未读取当前 workdir 的下载默认设置。</div>
+                <div class="mini-actions">
+                  <button class="btn2" id="btnReloadSettings" type="button">重新读取</button>
+                  <button class="btn" id="btnSaveSettings" type="submit">保存设置</button>
+                </div>
+              </div>
+            </form>
+          </section>
+        </section>
+      </section>
+    </section>
+  </main>
+  <script src="/static/workspace.js" defer></script>
+</body>
+</html>

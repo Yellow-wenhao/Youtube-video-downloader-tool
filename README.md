@@ -1,53 +1,36 @@
-# YouTube 视频下载工具（yt-dlp GUI）
+# YouTube Agent Downloader
 
-一个基于 `yt-dlp + PySide6` 的桌面工具，支持：
-- 在工具内输入查询词，检索 YouTube 视频并抓取元数据
-- 按规则筛选可下载 URL 并形成任务队列
-- 并发下载、断点续跑、失败重试、下载报告导出
-- 直观的队列执行界面与实时进度展示
+一个基于 `yt-dlp` 的本地 Agent 下载器，正在从旧版桌面 GUI 迁移到前后端分离的网页模式。
 
-适合批量采集与下载场景。
+当前目标：
 
-## 功能特性
+- 在浏览器中输入自然语言任务
+- 由本地 Agent 规划搜索、筛选与下载步骤
+- 通过本地后端 API 执行任务，而不是依赖 EXE 界面
+- 保留原有 CLI / 核心下载能力作为迁移基础
 
-### 1) 检索与筛选
-- 单行查询词输入（类似 YouTube 搜索框）
-- 可配置视频收集条数、最短时长、上传年份范围
-- 元数据抓取并发可调（加速第 2 步）
-- 生成标准中间文件：候选、筛选结果、URL 列表
+## 当前产品方向
 
-### 2) 队列与下载
-- 任务队列管理（启动筛选、下载选中、下载全部、恢复未完成）
-- 并发视频下载（最多 8）+ 分片并发
-- 失败 URL 自动记录并支持重试
-- SponsorBlock 清理（可选类别）
-- 字幕策略：不下载/不嵌入独立字幕轨，硬字幕不处理
-
-### 3) 进度与结果
-- 实时进度：元数据抓取进度、队列进度、当前视频进度
-- 并发任务卡片（每线程进度、已下载大小、速度）
-- 下载结果报告 `07_download_report.csv`（UTF-8 BOM，Excel 友好）
-- 报告字段精简为：
-  - `video_id`
-  - `title`
-  - `watch_url`
-  - `失败原因`
-  - `上传时间`
-
-### 4) 工具维护
-- 检查 `yt-dlp / ffmpeg` 当前版本与更新状态
-- 一键更新 `yt-dlp`
-- 一键更新 `ffmpeg`（优先 winget，回退 choco）
+- Web 工作台是默认本地入口
+- `app/web/main.py`
+  - 新的本地 Web 后端入口
+- `app/web/static/index.html`
+  - 新的浏览器工作台壳
+- `gui_app.py`
+  - 旧版桌面 GUI，作为 legacy 兼容入口与迁移参考，不再是默认产品壳
 
 ## 项目结构
 
 ```text
 D:\YTBDLP
-├─ gui_app.py                 # GUI 主程序
-├─ myvi_yt_batch.py           # 检索/筛选/下载后端
-├─ build_exe.ps1              # 打包脚本（PyInstaller）
-├─ requirements.txt           # 依赖
-├─ UPDATELOG.md               # 更新日志
+├─ app/
+│  ├─ agent/                  # Agent planner / runner
+│  ├─ core/                   # 可复用搜索、筛选、下载能力
+│  ├─ tools/                  # 工具层
+│  └─ web/                    # Web API 与前端壳
+├─ gui_app.py                 # 旧桌面 GUI（迁移参考）
+├─ youtube_batch.py           # 兼容 CLI 入口
+├─ requirements.txt
 └─ ...
 ```
 
@@ -57,82 +40,59 @@ D:\YTBDLP
 - Python 3.10+（推荐 3.12）
 - ffmpeg（建议加入 PATH）
 
-## 安装与运行（源码模式）
+## 安装与运行
+
+默认启动方式：
 
 ```powershell
-cd D:\YTBDLP
-python -m pip install -U -r requirements.txt
-python gui_app.py
+cd <repo-dir>
+.\run_web.bat
 ```
 
-## 打包 EXE（分发给他人）
+脚本会优先使用 conda 环境启动本地 Web 服务，默认环境名为 `base`，可通过环境变量 `YTBDLP_CONDA_ENV` 覆盖。
 
-### 一键打包
+如果需要手动执行：
+
 ```powershell
-powershell -ExecutionPolicy Bypass -File D:\YTBDLP\build_exe.ps1
+cd <repo-dir>
+conda run -n base python -m pip install -U -r requirements.txt
+conda run -n base python -m uvicorn --app-dir . app.web.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### 产物位置
-- `D:\YTBDLP\dist\YouTubeVideoDownloader_portable\`
+或直接使用启动脚本：
 
-> 注意：目录版发布时，必须连同 `_internal` 一起分发，不能只拷贝单个 exe。
-
-## 典型工作流
-
-1. 在「任务配置」输入查询词并设置筛选参数  
-2. 点击「启动筛选队列」生成并执行筛选任务  
-3. 在「队列执行」加载视频列表，勾选目标视频  
-4. 点击「下载勾选视频」或「下载选中任务」  
-5. 下载结束后查看报告 `07_download_report.csv`
-
-## CLI 用法（可选）
-
-### 仅筛选（不下载）
 ```powershell
-python myvi_yt_batch.py `
-  --query-text "Perodua Myvi" `
-  --workdir D:\YTBDLP\video_info `
-  --search-limit 50 `
-  --metadata-workers 4 `
-  --min-duration 10 `
-  --year-from 2020
+powershell -ExecutionPolicy Bypass -File .\run_web.ps1
 ```
 
-### 从 URL 文件直接下载
+打开浏览器访问：
+
+```text
+http://127.0.0.1:8000
+```
+
+## 迁移状态
+
+- Web 后端：默认本地入口
+- 浏览器前端：默认工作台
+- 桌面 GUI：冻结为 legacy compatibility path，仅保留迁移期参考和必要兼容修复
+
+## CLI 兼容
+
+旧 CLI 入口仍保留，便于迁移期间继续验证核心能力，但不再承担默认用户入口职责。
+
+## 测试基线
+
+当前前端自动化只保留最小 smoke 基线，不扩张成高成本 UI 自动化体系。优先保护的是 Web 工作台主链路是否还能正常渲染和完成关键交互。
+
+推荐基线命令：
+
 ```powershell
-python myvi_yt_batch.py `
-  --workdir D:\YTBDLP\video_info\run_xxx `
-  --download-dir D:\YTBDLP\downloads `
-  --download-from-urls-file D:\YTBDLP\video_info\run_xxx\05_selected_urls.txt `
-  --download `
-  --concurrent-videos 5 `
-  --concurrent-fragments 8
+cd <repo-dir>
+conda run -n base python -m unittest discover -s tests -p "test_web_workspace_smoke.py"
 ```
 
-## 常见问题（FAQ）
-
-### 1. 启动慢
-- 首次启动会加载 Qt 组件并进行工具探测，属正常现象
-- 当前版本已将版本检查改为后台异步，体感已优化
-
-### 2. `No video formats found`
-- 常见于地区限制、账号/风控、源视频下架、访问受限
-- 建议尝试：
-  - 降低并发
-  - 切换网络
-  - 使用 `cookies-from-browser`
-  - 重试失败 URL
-
-### 3. 打包版找不到 Python
-- 打包版执行后端任务仍依赖系统 Python（当前实现）
-- 若目标机器无 Python，请先安装 Python 3.10+
-
-## 开源计划（Roadmap）
-
-- [ ] 无 Python 依赖的纯打包版（后端内置）
-- [ ] 失败原因分类更细粒度与可视化统计
-- [ ] 下载任务历史中心（检索/筛选/下载全链路）
-- [ ] 多源镜像与网络诊断助手
+如涉及 Web API / 状态流改动，再补对应后端契约测试，而不是优先增加重型前端 UI 自动化。
 
 ## 免责声明
 
@@ -142,4 +102,3 @@ python myvi_yt_batch.py `
 ## License
 
 建议使用 MIT License（可在仓库中添加 `LICENSE` 文件）。
-
