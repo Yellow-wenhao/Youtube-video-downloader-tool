@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Sequence
 
 from app.core.environment_service import ffmpeg_location, resolve_runtime_binary
+from app.core.subprocess_utils import hidden_process_kwargs
 
 
 def run_command(cmd: Sequence[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -15,6 +16,7 @@ def run_command(cmd: Sequence[str], cwd: Path | None = None, check: bool = True)
         text=True,
         encoding="utf-8",
         errors="replace",
+        **hidden_process_kwargs(),
     )
     if check and proc.returncode != 0:
         msg = proc.stderr.strip() or proc.stdout.strip() or "unknown error"

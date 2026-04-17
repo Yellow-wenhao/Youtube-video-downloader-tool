@@ -13,6 +13,7 @@ from app.adapters.yt_dlp_adapter import yt_dlp_base
 from app.core.download_workspace_service import FAILED_URLS_FILENAME, persist_download_session_ref
 from app.core.models import DownloadSessionRef
 from app.core.report_service import chunked, extract_video_id, normalize_text, write_download_report_csv
+from app.core.subprocess_utils import hidden_process_kwargs
 
 
 def has_independent_subtitle_track(base_cmd: Sequence[str], url: str, timeout_sec: int = 25) -> Optional[bool]:
@@ -25,6 +26,7 @@ def has_independent_subtitle_track(base_cmd: Sequence[str], url: str, timeout_se
             encoding="utf-8",
             errors="replace",
             timeout=timeout_sec,
+            **hidden_process_kwargs(),
         )
     except subprocess.TimeoutExpired:
         return None
@@ -322,6 +324,7 @@ def download_selected(
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                **hidden_process_kwargs(),
             )
             out_chunks: List[str] = []
             assert proc.stdout is not None
@@ -340,7 +343,14 @@ def download_selected(
                 _log(clean_line)
             proc.wait()
             return proc.returncode, "".join(out_chunks).strip()
-        proc = subprocess.run(list(cmd), capture_output=True, text=True, encoding="utf-8", errors="replace")
+        proc = subprocess.run(
+            list(cmd),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            **hidden_process_kwargs(),
+        )
         text = (proc.stdout or "") + (proc.stderr or "")
         return proc.returncode, text.strip()
 
