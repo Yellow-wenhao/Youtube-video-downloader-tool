@@ -24,17 +24,19 @@ def _configure_release_stdio(log_path: Path) -> None:
     sys.stderr = stream
 
 
-def _release_log_config(log_path: Path) -> dict:
-    config = copy.deepcopy(LOGGING_CONFIG)
-    config["handlers"]["default"]["class"] = "logging.FileHandler"
-    config["handlers"]["default"]["filename"] = str(log_path)
-    config["handlers"]["default"]["encoding"] = "utf-8"
-    config["handlers"]["access"] = {
+def _file_handler_config(*, formatter: str, log_path: Path) -> dict:
+    return {
         "class": "logging.FileHandler",
-        "formatter": "access",
+        "formatter": formatter,
         "filename": str(log_path),
         "encoding": "utf-8",
     }
+
+
+def _release_log_config(log_path: Path) -> dict:
+    config = copy.deepcopy(LOGGING_CONFIG)
+    config["handlers"]["default"] = _file_handler_config(formatter="default", log_path=log_path)
+    config["handlers"]["access"] = _file_handler_config(formatter="access", log_path=log_path)
     return config
 
 

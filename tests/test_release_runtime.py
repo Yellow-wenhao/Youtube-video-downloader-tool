@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import logging.config
 import sys
 import tempfile
 import unittest
@@ -12,6 +14,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.core.environment_service import inspect_runtime_environment, resolve_runtime_binary
+from app.web.service_entry import _release_log_config
 from app.web.runtime_host import LocalWebRuntimeHost
 
 
@@ -71,6 +74,23 @@ class ReleaseRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["state"], "stopped")
         self.assertEqual(payload["active_requests"], 0)
         self.assertEqual(payload["background_jobs"], 0)
+
+    def test_release_log_config_rebuilds_file_handlers_without_console_only_args(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            log_path = Path(tmp) / "service.log"
+            config = _release_log_config(log_path)
+
+            self.assertNotIn("stream", config["handlers"]["default"])
+            self.assertNotIn("stream", config["handlers"]["access"])
+
+            logging.config.dictConfig(config)
+            try:
+                logger = logging.getLogger("uvicorn.error")
+                logger.info("release log smoke")
+            finally:
+                logging.shutdown()
+
+            self.assertTrue(log_path.exists())
 
 
 if __name__ == "__main__":
