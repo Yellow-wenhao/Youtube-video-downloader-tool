@@ -1,1 +1,4 @@
+# Packaging-only extras.
+# Runtime dependencies must stay in requirements.txt so release, dev, and test
+# environments all install the same agent/web runtime baseline.
 pyinstaller>=6.11.0

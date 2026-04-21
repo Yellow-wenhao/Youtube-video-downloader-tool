@@ -255,6 +255,22 @@
                     </div>
                   </section>
 
+                  <section class="inner">
+                    <div class="section">
+                      <h3>执行状态</h3>
+                      <span class="pill tone-neutral">LangGraph</span>
+                    </div>
+                    <div id="executionBox" class="empty">任务开始后，这里会显示当前步骤、下一步、确认边界和最近事件。</div>
+                  </section>
+
+                  <section class="inner" id="graphDebugPanel" hidden>
+                    <div class="section">
+                      <h3>Graph Debug</h3>
+                      <span class="pill tone-neutral" id="graphDebugPill">开发模式</span>
+                    </div>
+                    <div id="graphDebugBox" class="empty">仅本地开发模式下显示最近一个 LangGraph checkpoint。</div>
+                  </section>
+
                   <div id="confirmWrap"></div>
                 </div>
 

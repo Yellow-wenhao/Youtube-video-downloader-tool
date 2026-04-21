@@ -2,11 +2,11 @@
 
 ## Status
 
-本文件已降级为设计与 legacy GUI 参考文档，不再承担当前产品路线的执行排期。
+本文档已降级为设计与 legacy GUI 参考文档，不再承担当前产品路线的执行排期。
 
 当前唯一有效的项目推进清单是：
 
-- [AGENT_TODO.md](D:/YTBDLP/docs/AGENT_TODO.md)
+- [AGENT_TODO.md](./AGENT_TODO.md)
 
 ## Why
 
@@ -15,9 +15,9 @@
 - 主产品界面是 `app/web/`
 - 桌面 GUI 是 legacy compatibility surface
 
-因此，原先这份文档里“Phase 1/2/3/4/5”的执行顺序，不再代表当前项目真实优先级。
+因此，原先这份文档里 “Phase 1/2/3/4/5” 的执行顺序，不再代表当前项目真实优先级。
 
-## What This File Is For Now
+## Historical Reference
 
 保留它，只为了三件事：
 
@@ -38,7 +38,7 @@
 
 仍未完成、但当前默认不执行的 legacy 项：
 
-- [ ] 为 queue 卡片和 review 卡片补一致的 focus 样式
+- [ ] 统一 queue 卡片和 review 卡片的 focus 样式
 - [ ] 审查 config / queue / Agent 视图的 tab 顺序
 - [ ] 在 legacy GUI 下验证 `125%` Windows 缩放和 `1366px` 宽度
 - [ ] 给 queue / review / Agent 区补更丰富的 empty state
@@ -47,9 +47,9 @@
 
 ## Rule
 
-如果这里的某个事项重新变成当前优先工作，必须先完成下列动作之一：
+如果这里的某一项重新变成当前优先工作，必须先完成下列动作之一：
 
-1. 把它迁移到 [AGENT_TODO.md](D:/YTBDLP/docs/AGENT_TODO.md)
+1. 把它迁移到 [AGENT_TODO.md](./AGENT_TODO.md)
 2. 明确标注为 legacy GUI 专项修复，并在提交中说明不影响 Web-first 默认路线
 
 在此之前，本文件只提供参考，不提供排期。

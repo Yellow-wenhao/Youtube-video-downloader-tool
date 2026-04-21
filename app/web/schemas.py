@@ -85,6 +85,49 @@ class TaskStepView(BaseModel):
     has_result: bool = False
 
 
+class TaskExecutionStepView(BaseModel):
+    step_id: str
+    title: str
+    tool_name: str
+    status: str
+    status_label: str = ""
+    status_tone: str = "neutral"
+    message: str = ""
+    requires_confirmation: bool = False
+
+
+class TaskExecutionInsightView(BaseModel):
+    planner_name: str = ""
+    planner_notes: list[str] = Field(default_factory=list)
+    current_step: TaskExecutionStepView | None = None
+    next_step: TaskExecutionStepView | None = None
+    last_completed_step: TaskExecutionStepView | None = None
+    pending_confirmation_step: TaskExecutionStepView | None = None
+    failed_step: TaskExecutionStepView | None = None
+    recent_event: dict[str, Any] | None = None
+    total_steps: int = 0
+    completed_steps: int = 0
+    remaining_steps: int = 0
+
+
+class TaskGraphDebugResponse(BaseModel):
+    enabled: bool = False
+    task_id: str
+    node_name: str = ""
+    updated_at: str = ""
+    task_status: str = ""
+    planner_name: str = ""
+    planner_notes: list[str] = Field(default_factory=list)
+    selected_step_id: str = ""
+    selected_step_index: int | None = None
+    pending_step_id: str = ""
+    failure_origin: str = ""
+    last_error: dict[str, Any] = Field(default_factory=dict)
+    resolved_payload_keys: list[str] = Field(default_factory=list)
+    step_result_keys: list[str] = Field(default_factory=list)
+    runtime_default_keys: list[str] = Field(default_factory=list)
+
+
 class TaskMetricsView(BaseModel):
     total_steps: int = 0
     completed_steps: int = 0
@@ -358,6 +401,7 @@ class TaskDetailView(BaseModel):
     active_elapsed_seconds: float | None = None
     metrics: TaskMetricsView = Field(default_factory=TaskMetricsView)
     steps: list[TaskStepView] = Field(default_factory=list)
+    execution: TaskExecutionInsightView | None = None
     params: dict[str, Any] = Field(default_factory=dict)
     task_paths: dict[str, str] = Field(default_factory=dict)
     download_progress: TaskDownloadProgressView | None = None
@@ -383,6 +427,7 @@ class TaskLifecycleResponse(BaseModel):
     summary: TaskSummaryView | None = None
     result: TaskResultView | None = None
     failure: TaskFailureDiagnosisView | None = None
+    execution: TaskExecutionInsightView | None = None
     focus_summary: TaskFocusSummaryView | None = None
     events_tail: list[TaskEventView] = Field(default_factory=list)
     events_tail_count: int = 0
@@ -406,6 +451,7 @@ class TaskStatusPollResponse(BaseModel):
     current_step_status: str = ""
     summary: TaskSummaryView | None = None
     failure: TaskFailureDiagnosisView | None = None
+    execution: TaskExecutionInsightView | None = None
     focus_summary: TaskFocusSummaryView | None = None
     events_tail: list[TaskEventView] = Field(default_factory=list)
     events_tail_count: int = 0

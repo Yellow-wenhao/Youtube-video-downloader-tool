@@ -778,6 +778,62 @@ button:disabled {
   gap: 12px;
 }
 
+.execution-shell,
+.execution-summary,
+.execution-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.execution-summary {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.execution-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.execution-card,
+.execution-event {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.execution-card.muted {
+  background: rgba(250, 250, 250, 0.9);
+}
+
+.execution-card strong {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.execution-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: start;
+  flex-wrap: wrap;
+}
+
+.graph-debug-details {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 18px;
+  padding: 12px 14px;
+  background: rgba(248, 250, 252, 0.92);
+}
+
+.graph-debug-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
 .metric,
 .task,
 .empty {

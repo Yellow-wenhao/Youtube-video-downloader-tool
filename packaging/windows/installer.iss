@@ -1,6 +1,6 @@
 #define MyAppName "YouTube Downloader"
 #ifndef AppVersion
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.1.4"
 #endif
 #ifndef SourceDir
   #define SourceDir "build\\release\\portable\\youtube-downloader-web-v" + AppVersion + "-win-x64"

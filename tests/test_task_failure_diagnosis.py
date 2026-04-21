@@ -122,13 +122,12 @@ class TaskFailureDiagnosisTests(unittest.TestCase):
         with _workspace_tempdir() as tmp:
             workdir = Path(tmp)
             store = TaskStore(workdir)
-            session = SessionStore(workdir)
             runner = AgentRunner(registry=_DummyRegistry())
             task = self._task(workdir, status=TaskStatus.PLANNED, payload={"items_path": "{{steps.search.output_path}}"})
             task.steps[0].status = StepStatus.PENDING
             store.save_task(task)
 
-            result = runner.execute_task(task, store, session, auto_confirm=True)
+            result = runner.resume(workdir, task_id=task.task_id, auto_confirm=True)
             failure = build_task_failure_diagnosis(task, result)
 
             self.assertEqual(result.status, TaskStatus.FAILED)

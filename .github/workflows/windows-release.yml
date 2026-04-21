@@ -26,10 +26,17 @@ jobs:
         id: version
         shell: pwsh
         run: |
+          $baseVersion = (Get-Content VERSION -Raw).Trim()
+          if (-not $baseVersion) {
+            throw "VERSION file is empty"
+          }
           if ("${{ github.ref_type }}" -eq "tag") {
             $version = "${{ github.ref_name }}".TrimStart("v")
+            if ($version -ne $baseVersion) {
+              throw "Tag version '$version' does not match VERSION '$baseVersion'"
+            }
           } else {
-            $version = "0.1.0-dev.${{ github.run_number }}"
+            $version = "$baseVersion-dev.${{ github.run_number }}"
           }
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 

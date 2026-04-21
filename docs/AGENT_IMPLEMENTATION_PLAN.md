@@ -1,5 +1,11 @@
 # Agent Implementation Plan
 
+## Status
+
+This document is now a historical implementation reference.
+
+The repository has already crossed the main migration seam described below. Keep using this file for architectural context, but treat [AGENT_TODO.md](./AGENT_TODO.md) as the live execution checklist.
+
 ## 1. Objective
 
 Turn the current downloader into a task-oriented agent application with minimal rewrite risk.

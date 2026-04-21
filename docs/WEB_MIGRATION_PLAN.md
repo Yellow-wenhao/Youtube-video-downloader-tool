@@ -1,5 +1,11 @@
 # Web Migration Plan
 
+## Status
+
+This document is now a historical architecture reference.
+
+The Web-first migration described below has already been completed at the product-direction level. New execution priorities should be tracked in [AGENT_TODO.md](./AGENT_TODO.md), not in this file.
+
 ## Decision
 
 The desktop EXE is no longer the primary product direction.

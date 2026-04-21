@@ -6,9 +6,25 @@
 
 ```powershell
 cd <repo-dir>
-conda run -n base python -m pip install -U -r requirements.txt
+conda run -n base python -m pip install -U -r requirements-dev.txt
 .\run_web.bat
 ```
+
+当前默认开发解释器是 Miniconda `base` 环境。
+不要再假设“任意本机 Python”或“任意 conda 环境”都能直接运行当前仓库。
+
+标准开发环境至少应包含：
+
+- `langgraph`
+- `fastapi`
+- `uvicorn`
+- `yt-dlp`
+
+依赖边界约定：
+
+- `requirements.txt` 只放运行时依赖，必须覆盖 Agent / Web / CLI 的共同基线
+- `requirements-dev.txt` 是本地开发与测试安装入口
+- `requirements-release.txt` 只放打包额外依赖，不承载 LangGraph runtime
 
 默认按 Web-first 路径开发和验收：
 
@@ -23,7 +39,22 @@ cd <repo-dir>
 conda run -n base python -m unittest discover -s tests -p "test_web_workspace_smoke.py"
 ```
 
+如只检查当前解释器依赖是否齐全，不启动 Web：
+
+```powershell
+.\run_web.bat -CheckOnly
+```
+
 除非确实出现高频 UI 回归，否则不要把它扩张成高成本的全量前端自动化体系。
+
+如需覆盖默认环境名，可使用：
+
+```powershell
+$env:YTBDLP_CONDA_ENV="your-env-name"
+.\run_web.bat
+```
+
+但仓库内所有文档、脚本和回归命令默认都以 `base` 为示例和基线。
 
 ## 2. 分支与提交规范
 

@@ -7,7 +7,9 @@ from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 ROOT = Path.cwd()
 datas = collect_data_files("app", include_py_files=False)
-hiddenimports = collect_submodules("app")
+# LangGraph is part of the runtime baseline now. Keep it explicit in release
+# packaging so build-time module discovery does not silently drift from dev.
+hiddenimports = collect_submodules("app") + collect_submodules("langgraph")
 
 
 a = Analysis(

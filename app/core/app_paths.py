@@ -14,10 +14,15 @@ DEFAULT_RUNTIME_PORT = 8765
 DEFAULT_IDLE_TIMEOUT_SECONDS = 15 * 60
 RELEASE_LAUNCHER_EXE_NAME = "youtube-downloader.exe"
 RELEASE_SERVICE_EXE_NAME = "youtube-downloader-service.exe"
+VERSION_FILE_NAME = "VERSION"
 
 
 def project_root() -> Path:
     return Path(__file__).resolve().parents[2]
+
+
+def version_file_path() -> Path:
+    return project_root() / VERSION_FILE_NAME
 
 
 def is_frozen_app() -> bool:
@@ -38,8 +43,18 @@ def runtime_port(default: int = DEFAULT_RUNTIME_PORT) -> int:
         return int(default)
 
 
-def app_version(default: str = "0.1.0") -> str:
-    return os.environ.get(APP_VERSION_ENV, "").strip() or default
+def app_version(default: str = "0.1.4") -> str:
+    env_value = os.environ.get(APP_VERSION_ENV, "").strip()
+    if env_value:
+        return env_value
+
+    version_file = version_file_path()
+    if version_file.exists():
+        file_value = version_file.read_text(encoding="utf-8").strip()
+        if file_value:
+            return file_value
+
+    return default
 
 
 def runtime_root() -> Path:

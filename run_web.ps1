@@ -1,3 +1,7 @@
+param(
+    [switch]$CheckOnly
+)
+
 $ErrorActionPreference = "Stop"
 
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -27,30 +31,55 @@ function Resolve-CondaExe {
     return $null
 }
 
+function Resolve-CurrentPythonExe {
+    if ($env:YTBDLP_PYTHON) {
+        return $env:YTBDLP_PYTHON
+    }
+    if ($env:CONDA_PREFIX) {
+        $condaPython = Join-Path $env:CONDA_PREFIX "python.exe"
+        if (Test-Path -LiteralPath $condaPython) {
+            return $condaPython
+        }
+    }
+    return "python"
+}
+
 $CondaExe = Resolve-CondaExe
-$UseConda = $null -ne $CondaExe
+$AlreadyInTargetCondaEnv = ($env:CONDA_DEFAULT_ENV -eq $CondaEnvName)
+$UseConda = ($null -ne $CondaExe) -and (-not $AlreadyInTargetCondaEnv)
+$PythonExe = Resolve-CurrentPythonExe
+
+function Invoke-EnvironmentSelfCheck {
+    if ($UseConda) {
+        & $CondaExe run -n $CondaEnvName python -m app.core.startup_self_check | Out-Host
+    } else {
+        & $PythonExe -m app.core.startup_self_check | Out-Host
+    }
+    return $LASTEXITCODE
+}
 
 Write-Host "Starting YouTube Downloader development workspace at $Url" -ForegroundColor Cyan
 if ($UseConda) {
     Write-Host "Using conda environment: $CondaEnvName" -ForegroundColor DarkCyan
+} elseif ($AlreadyInTargetCondaEnv) {
+    Write-Host "Already running inside conda environment: $CondaEnvName" -ForegroundColor DarkCyan
 } else {
     Write-Host "Conda not found. Falling back to current Python: $PythonExe" -ForegroundColor Yellow
 }
 
 Push-Location $Root
 try {
-    if ($UseConda) {
-        & $CondaExe run -n $CondaEnvName python -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('fastapi') and importlib.util.find_spec('uvicorn') else 1)"
-    } else {
-        & $PythonExe -c "import importlib.util, sys; sys.exit(0 if importlib.util.find_spec('fastapi') and importlib.util.find_spec('uvicorn') else 1)"
-    }
-    if ($LASTEXITCODE -ne 0) {
+    $checkExitCode = Invoke-EnvironmentSelfCheck
+    if ($checkExitCode -ne 0) {
         if ($UseConda) {
-            Write-Host "Missing dependencies in conda env '$CondaEnvName'. Run: conda run -n $CondaEnvName python -m pip install -U -r requirements.txt" -ForegroundColor Yellow
+            Write-Host "Missing dependencies in conda env '$CondaEnvName'. Required: langgraph, fastapi, uvicorn, yt-dlp. Run: conda run -n $CondaEnvName python -m pip install -U -r requirements-dev.txt" -ForegroundColor Yellow
         } else {
-            Write-Host "Missing dependencies in current Python. Run: $PythonExe -m pip install -U -r requirements.txt" -ForegroundColor Yellow
+            Write-Host "Missing dependencies in current Python. Required: langgraph, fastapi, uvicorn, yt-dlp. Run: $PythonExe -m pip install -U -r requirements-dev.txt" -ForegroundColor Yellow
         }
         exit 1
+    }
+    if ($CheckOnly) {
+        exit 0
     }
     Start-Job -ScriptBlock {
         param($TargetUrl)

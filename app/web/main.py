@@ -16,10 +16,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.agent.planner import PlannerRuntimeError
+from app.agent.langgraph_runtime import GraphCheckpointStore
 from app.agent.runner import AgentRunner, AgentRunnerError, AgentRunnerPlanningError
 from app.agent.session_store import SessionStore
 from app.agent.llm_planner import test_llm_connection
-from app.core.app_paths import default_download_dir, default_workdir
+from app.core.app_paths import app_version, default_download_dir, default_workdir
 from app.core.download_workspace_service import (
     build_retry_task_payload,
     build_download_task_payload,
@@ -64,6 +65,7 @@ from app.web.schemas import (
     TaskEventView,
     TaskFailureDiagnosisView,
     TaskFocusSummaryView,
+    TaskGraphDebugResponse,
     TaskLifecycleResponse,
     TaskListResponse,
     TaskLogsResponse,
@@ -76,6 +78,8 @@ from app.web.schemas import (
     TaskReviewSummaryView,
     TaskDownloadLaunchResponse,
     TaskDownloadProgressView,
+    TaskExecutionInsightView,
+    TaskExecutionStepView,
     TaskWorkspaceConfirmationView,
     TaskWorkspaceDownloadEntryView,
     TaskStepView,
@@ -92,7 +96,7 @@ async def _lifespan(_app: FastAPI):
     runtime_host.shutdown()
 
 
-app = FastAPI(title="YouTube Downloader Web Workspace", version="0.1.0", lifespan=_lifespan)
+app = FastAPI(title="YouTube Downloader Web Workspace", version=app_version(), lifespan=_lifespan)
 
 STATIC_DIR = Path(__file__).with_name("static")
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
@@ -352,6 +356,15 @@ def get_task_focus_summary(task_id: str, workdir: str) -> TaskFocusSummaryView:
     return _build_focus_summary(store, task)
 
 
+@app.get("/api/tasks/{task_id}/graph-debug", response_model=TaskGraphDebugResponse)
+def get_task_graph_debug(task_id: str, workdir: str) -> TaskGraphDebugResponse:
+    if not _graph_debug_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    store = TaskStore(workdir)
+    task = _load_task_or_404(store, task_id)
+    return _build_graph_debug_response(task)
+
+
 @app.get("/api/tasks/{task_id}/lifecycle", response_model=TaskLifecycleResponse)
 def get_task_lifecycle(
     task_id: str,
@@ -373,10 +386,17 @@ def get_task_lifecycle(
         failure=failure,
     )
     return TaskLifecycleResponse(
-        task=_build_task_detail(store, task, summary=summary, event_count=len(store.load_events(task_id))),
+        task=_build_task_detail(
+            store,
+            task,
+            summary=summary,
+            event_count=len(store.load_events(task_id)),
+            events=events,
+        ),
         summary=_build_summary_view(summary) if summary is not None else None,
         result=_build_result_view(result, task=task, summary=summary) if result is not None else None,
         failure=failure,
+        execution=_build_execution_insight(task, events=events),
         focus_summary=_build_focus_summary(store, task),
         events_tail=[_build_event_view(event) for event in events],
         events_tail_count=len(events),
@@ -423,6 +443,7 @@ def poll_task_status(
         current_step_status=current_step_status,
         summary=_build_summary_view(summary) if summary is not None else None,
         failure=failure,
+        execution=_build_execution_insight(task, events=events),
         focus_summary=_build_focus_summary(store, task),
         events_tail=[_build_event_view(event) for event in events],
         events_tail_count=len(events),
@@ -674,7 +695,141 @@ def _build_event_view(event) -> TaskEventView:
     )
 
 
-def _build_task_detail(store: TaskStore, task: TaskSpec, *, summary: TaskSummary | None, event_count: int) -> TaskDetailView:
+def _load_graph_checkpoint_state(workdir: str, task_id: str) -> dict[str, Any]:
+    try:
+        checkpoint = GraphCheckpointStore(workdir).load(task_id)
+    except Exception:
+        return {}
+    if checkpoint is None:
+        return {}
+    _, state = checkpoint
+    return dict(state)
+
+
+def _graph_debug_enabled() -> bool:
+    value = str(os.getenv("YTBDLP_ENABLE_GRAPH_DEBUG", "")).strip().lower()
+    return value in {"1", "true", "yes", "on"}
+
+
+def _checkpoint_debug_lists(checkpoint_state: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
+    resolved_payload_keys = sorted(str(key) for key in (checkpoint_state.get("resolved_payloads") or {}).keys())
+    step_result_keys = sorted(str(key) for key in (checkpoint_state.get("step_results") or {}).keys())
+    runtime_default_keys = sorted(str(key) for key in (checkpoint_state.get("runtime_defaults") or {}).keys())
+    return resolved_payload_keys, step_result_keys, runtime_default_keys
+
+
+def _build_graph_debug_response(task: TaskSpec) -> TaskGraphDebugResponse:
+    checkpoint_store = GraphCheckpointStore(task.workdir)
+    checkpoint = checkpoint_store.load(task.task_id)
+    checkpoint_payload = checkpoint_store.load_payload(task.task_id)
+    if checkpoint is None or checkpoint_payload is None:
+        return TaskGraphDebugResponse(
+            enabled=True,
+            task_id=task.task_id,
+            task_status=task.status.value,
+            planner_name="",
+        )
+    node_name, checkpoint_state = checkpoint
+    resolved_payload_keys, step_result_keys, runtime_default_keys = _checkpoint_debug_lists(checkpoint_state)
+    return TaskGraphDebugResponse(
+        enabled=True,
+        task_id=task.task_id,
+        node_name=node_name,
+        updated_at=str(checkpoint_payload.get("updated_at") or ""),
+        task_status=task.status.value,
+        planner_name=str(checkpoint_state.get("planner_name") or ""),
+        planner_notes=[str(item) for item in (checkpoint_state.get("planner_notes") or []) if str(item).strip()],
+        selected_step_id=str(checkpoint_state.get("selected_step_id") or ""),
+        selected_step_index=checkpoint_state.get("selected_step_index"),
+        pending_step_id=str(checkpoint_state.get("pending_step_id") or ""),
+        failure_origin=str(checkpoint_state.get("failure_origin") or ""),
+        last_error=dict(checkpoint_state.get("last_error") or {}),
+        resolved_payload_keys=resolved_payload_keys,
+        step_result_keys=step_result_keys,
+        runtime_default_keys=runtime_default_keys,
+    )
+
+
+def _execution_step_view(step: TaskStep | None) -> TaskExecutionStepView | None:
+    if step is None:
+        return None
+    return TaskExecutionStepView(
+        step_id=step.step_id,
+        title=step.title,
+        tool_name=step.tool_name,
+        status=step.status.value,
+        status_label=_status_label(step.status.value),
+        status_tone=_status_tone(step.status.value),
+        message=step.message,
+        requires_confirmation=step.requires_confirmation,
+    )
+
+
+def _next_step(task: TaskSpec) -> TaskStep | None:
+    active = _active_step(task)
+    seen_active = active is None
+    for step in task.steps:
+        if not seen_active:
+            if active is step:
+                seen_active = True
+            continue
+        if step.status == StepStatus.PENDING:
+            return step
+    return None
+
+
+def _last_completed_step(task: TaskSpec) -> TaskStep | None:
+    for step in reversed(task.steps):
+        if step.status == StepStatus.COMPLETED:
+            return step
+    return None
+
+
+def _failed_step(task: TaskSpec) -> TaskStep | None:
+    for step in task.steps:
+        if step.status == StepStatus.FAILED:
+            return step
+    return None
+
+
+def _pending_confirmation_step(task: TaskSpec) -> TaskStep | None:
+    for step in task.steps:
+        if step.status == StepStatus.AWAITING_CONFIRMATION:
+            return step
+    return None
+
+
+def _build_execution_insight(
+    task: TaskSpec,
+    *,
+    events: list | None = None,
+) -> TaskExecutionInsightView:
+    checkpoint_state = _load_graph_checkpoint_state(task.workdir, task.task_id)
+    completed_steps = sum(1 for step in task.steps if step.status == StepStatus.COMPLETED)
+    recent_event = events[-1] if events else None
+    return TaskExecutionInsightView(
+        planner_name=str(checkpoint_state.get("planner_name") or ""),
+        planner_notes=[str(item) for item in (checkpoint_state.get("planner_notes") or []) if str(item).strip()],
+        current_step=_execution_step_view(_active_step(task)),
+        next_step=_execution_step_view(_next_step(task)),
+        last_completed_step=_execution_step_view(_last_completed_step(task)),
+        pending_confirmation_step=_execution_step_view(_pending_confirmation_step(task)),
+        failed_step=_execution_step_view(_failed_step(task)),
+        recent_event=_build_event_view(recent_event).model_dump() if recent_event is not None else None,
+        total_steps=len(task.steps),
+        completed_steps=completed_steps,
+        remaining_steps=max(len(task.steps) - completed_steps, 0),
+    )
+
+
+def _build_task_detail(
+    store: TaskStore,
+    task: TaskSpec,
+    *,
+    summary: TaskSummary | None,
+    event_count: int,
+    events: list | None = None,
+) -> TaskDetailView:
     metrics = _compute_metrics(task, event_count=event_count)
     current_step_title, current_step_status = _current_step(task)
     return TaskDetailView(
@@ -696,6 +851,7 @@ def _build_task_detail(store: TaskStore, task: TaskSpec, *, summary: TaskSummary
         active_elapsed_seconds=_compute_active_elapsed_seconds(store, task),
         metrics=metrics,
         steps=[_build_step_view(step) for step in task.steps],
+        execution=_build_execution_insight(task, events=events),
         params=task.params,
         task_paths=store.task_paths(task.task_id),
         download_progress=_build_download_progress_view(store.load_download_progress(task.task_id)),
@@ -1422,12 +1578,11 @@ def _create_download_task_from_selection(source_task: TaskSpec) -> TaskSpec:
 
 def _run_task_worker(workdir: str, task_id: str, auto_confirm: bool) -> None:
     store = TaskStore(workdir)
-    session = SessionStore(workdir)
     task = store.load_task(task_id)
     runner = AgentRunner()
     with runtime_host.background_job(f"task:{task_id}"):
         try:
-            runner.execute_task(task, store, session, auto_confirm=auto_confirm)
+            runner.resume(workdir, task_id=task_id, auto_confirm=auto_confirm)
         except Exception as exc:
             store.set_task_status(task, TaskStatus.FAILED, f"后台下载任务启动失败: {exc}")
             store.save_result(

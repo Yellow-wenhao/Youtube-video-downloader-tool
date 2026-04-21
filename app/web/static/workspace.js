@@ -48,7 +48,9 @@ const state = {
   pendingResumeTaskId: "",
   pendingDownloadLaunch: false,
   pendingRetrySessionDir: "",
-  renderCache: { metrics: "", download: "", entry: "", confirm: "", queue: "", logs: "" },
+  agentFailure: null,
+  graphDebug: null,
+  renderCache: { metrics: "", execution: "", graphDebug: "", download: "", entry: "", confirm: "", queue: "", logs: "" },
 };
 
 const $ = (id) => document.getElementById(id);
@@ -92,6 +94,10 @@ const els = {
   overallFill: $("overallFill"),
   overallDetail: $("overallDetail"),
   metricGrid: $("metricGrid"),
+  executionBox: $("executionBox"),
+  graphDebugPanel: $("graphDebugPanel"),
+  graphDebugPill: $("graphDebugPill"),
+  graphDebugBox: $("graphDebugBox"),
   confirmWrap: $("confirmWrap"),
   downloadPhase: $("downloadPhase"),
   downloadBox: $("downloadBox"),
@@ -226,6 +232,18 @@ function fmtBytes(value) {
   return `${size.toFixed(digits)} ${units[index]}`;
 }
 
+function compactTime(value) {
+  const date = parseDate(value);
+  if (!date) return "-";
+  return new Intl.DateTimeFormat(undefined, {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
+}
+
 function tone(status) {
   const value = String(status || "").toLowerCase();
   if (["failed", "error", "danger"].includes(value)) return "danger";
@@ -233,6 +251,28 @@ function tone(status) {
   if (["running", "preparing_download", "downloading", "finalizing", "info"].includes(value)) return "info";
   if (["succeeded", "completed", "success"].includes(value)) return "success";
   return "neutral";
+}
+
+function stepSummaryMarkup(label, step, fallback = "暂无") {
+  if (!step) {
+    return `
+      <article class="execution-card muted">
+        <div class="k">${esc(label)}</div>
+        <strong>${esc(fallback)}</strong>
+        <div class="subtle">当前没有可展示的步骤信息。</div>
+      </article>
+    `;
+  }
+  return `
+    <article class="execution-card">
+      <div class="execution-head">
+        <div class="k">${esc(label)}</div>
+        <span class="pill tone-${escA(step.status_tone || tone(step.status))}">${esc(step.tool_name || "-")}</span>
+      </div>
+      <strong>${esc(step.title || step.step_id || "未命名步骤")}</strong>
+      <div class="subtle">${esc(step.message || (step.requires_confirmation ? "这个步骤需要确认后才能继续。" : "等待执行或更新中。"))}</div>
+    </article>
+  `;
 }
 
 function taskStatusText(status) {
@@ -470,6 +510,105 @@ function formatAgentFeedback(response, fallbackTitle = "操作失败", fallbackM
   const message = response.user_message || fallbackMessage;
   const recovery = response.user_recovery || "";
   return recovery ? `${title}：${message} ${recovery}` : `${title}：${message}`;
+}
+
+function clearAgentFailure() {
+  state.agentFailure = null;
+}
+
+function setAgentFailure(kind, response, extra = {}) {
+  const actions = [];
+  if (kind === "run") {
+    actions.push({ label: "重试运行", action: "retry-run", style: "btn" });
+  } else if (kind === "resume") {
+    actions.push({ label: "重新恢复", action: "retry-resume", style: "btn" });
+  }
+  if (extra.taskId || state.currentTaskId) {
+    actions.push({ label: "刷新任务状态", action: "reload-current-task", style: "btn2" });
+    actions.push({ label: "查看日志", action: "go-logs", style: "btn2" });
+  } else {
+    actions.push({ label: "回到任务输入", action: "focus-run", style: "btn2" });
+  }
+  actions.push({ label: "检查设置", action: "go-settings", style: "btn2" });
+
+  state.agentFailure = {
+    kind,
+    title: response?.user_title || (kind === "resume" ? "任务恢复失败" : "任务运行失败"),
+    message: response?.user_message || "",
+    recovery: response?.user_recovery || "",
+    code: response?.code || "",
+    category: response?.error_category || "unknown",
+    taskId: extra.taskId || state.currentTaskId || "",
+    workdir: extra.workdir || state.currentWorkdir || els.workdir.value.trim(),
+    actions,
+  };
+}
+
+function failureRecoveryMarkup(failure) {
+  if (!failure) return "";
+  const messageParts = [failure.message, failure.recovery].filter(Boolean);
+  return `
+    <section class="inner recovery-card">
+      <div class="section">
+        <h3>${esc(failure.kind === "resume" ? "恢复没有成功" : "运行没有成功")}</h3>
+        <span class="pill tone-danger">${esc(failure.code || failure.category || "需要处理")}</span>
+      </div>
+      <div class="message"><strong>${esc(failure.title || "当前操作失败")}</strong>${messageParts.length ? `：${esc(messageParts.join(" "))}` : ""}</div>
+      <div class="actions" style="margin-top:12px">
+        ${failure.actions.map((item) => `<button class="${escA(item.style || "btn2")}" type="button" data-ui-action="${escA(item.action)}">${esc(item.label)}</button>`).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function debugListMarkup(label, items) {
+  const values = Array.isArray(items) && items.length ? items : ["-"];
+  return `<article class="metric"><div class="k">${esc(label)}</div><div class="v">${esc(values.join(", "))}</div></article>`;
+}
+
+function renderGraphDebug() {
+  const payload = state.graphDebug;
+  if (!payload?.enabled) {
+    if (els.graphDebugPanel) els.graphDebugPanel.hidden = true;
+    if (els.graphDebugBox) els.graphDebugBox.textContent = "仅本地开发模式下显示最近一个 LangGraph checkpoint。";
+    state.renderCache.graphDebug = "";
+    return;
+  }
+  if (els.graphDebugPanel) els.graphDebugPanel.hidden = false;
+  if (els.graphDebugPill) {
+    els.graphDebugPill.className = `pill tone-${payload.failure_origin || payload.last_error?.message ? "warn" : "info"}`;
+    els.graphDebugPill.textContent = payload.node_name || "checkpoint";
+  }
+  const errorText = payload.last_error?.message
+    ? `${payload.last_error.message}${payload.failure_origin ? ` · ${payload.failure_origin}` : ""}`
+    : "当前没有记录到 graph 执行错误。";
+  const html = `
+    <details class="graph-debug-details">
+      <summary>查看最近一个 graph checkpoint</summary>
+      <div class="execution-shell" style="margin-top:12px">
+        <div class="execution-summary">
+          <article class="metric"><div class="k">节点</div><div class="v">${esc(payload.node_name || "-")}</div><div class="d">${esc(payload.updated_at ? `更新于 ${fmtTime(payload.updated_at)}` : "还没有 checkpoint 时间戳")}</div></article>
+          <article class="metric"><div class="k">规划器</div><div class="v">${esc(payload.planner_name || "-")}</div><div class="d">${esc((payload.planner_notes || []).join(" · ") || "没有 planner notes")}</div></article>
+          <article class="metric"><div class="k">选中步骤</div><div class="v">${esc(payload.selected_step_id || "-")}</div><div class="d">${esc(payload.selected_step_index == null ? "没有 selected_step_index" : `index ${payload.selected_step_index}`)}</div></article>
+          <article class="metric"><div class="k">等待确认</div><div class="v">${esc(payload.pending_step_id || "-")}</div><div class="d">${esc(payload.task_status || "未知任务状态")}</div></article>
+        </div>
+        <div class="execution-event">
+          <div class="k">最近错误</div>
+          <div class="message">${esc(errorText)}</div>
+        </div>
+        <div class="metrics">
+          ${debugListMarkup("resolved_payloads", payload.resolved_payload_keys)}
+          ${debugListMarkup("step_results", payload.step_result_keys)}
+          ${debugListMarkup("runtime_defaults", payload.runtime_default_keys)}
+        </div>
+      </div>
+    </details>
+  `;
+  if (html !== state.renderCache.graphDebug) {
+    els.graphDebugBox.className = "";
+    els.graphDebugBox.innerHTML = html;
+    state.renderCache.graphDebug = html;
+  }
 }
 
 function curProvider() {
@@ -916,7 +1055,20 @@ function resultsSummaryMarkup(payload) {
   `;
 }
 
-function workspaceActionsMarkup({ stage, selectedCount, downloadEntry, hasReview }) {
+function workspaceActionsMarkup({ stage, selectedCount, downloadEntry, hasReview, agentFailure = null }) {
+  if (agentFailure) {
+    return `
+      <section class="action-callout">
+        <div>
+          <strong>${esc(agentFailure.kind === "resume" ? "恢复被中断，需要你决定下一步" : "本次运行没有完成，可以直接继续处理")}</strong>
+          <div class="subtle">${esc([agentFailure.message, agentFailure.recovery].filter(Boolean).join(" ") || "可以直接重试，也可以先检查日志和设置。")}</div>
+        </div>
+        <div class="mini-actions">
+          ${agentFailure.actions.map((item) => `<button class="${escA(item.style || "btn2")}" type="button" data-workspace-action="${escA(item.action)}">${esc(item.label)}</button>`).join("")}
+        </div>
+      </section>
+    `;
+  }
   if (!state.currentTaskId) {
     return `
       <section class="action-callout">
@@ -1551,6 +1703,7 @@ function failureDiagnosisMarkup(failure) {
 function renderStatus(payload) {
   const task = payload?.task || null;
   const summary = payload?.summary || null;
+  const execution = payload?.execution || task?.execution || null;
   const downloadProgress = payload?.download_progress || task?.download_progress || null;
   const stage = payload?.workspace_stage || fallbackStage(task, downloadProgress);
   const stageLabel = payload?.workspace_stage_label || fallbackStageLabel(stage);
@@ -1567,9 +1720,10 @@ function renderStatus(payload) {
   const selectedCount = reviewSelectedCount();
   const totalReviewCount = Number(state.review?.summary?.total_count || 0);
   const hasReview = !!state.review?.available;
+  const agentFailure = state.agentFailure;
 
   setHeader(task, summary, stageLabel, primaryMessage);
-  els.workspaceActionsBar.innerHTML = workspaceActionsMarkup({ stage, selectedCount, downloadEntry, hasReview });
+  els.workspaceActionsBar.innerHTML = workspaceActionsMarkup({ stage, selectedCount, downloadEntry, hasReview, agentFailure });
 
   els.updatedPill.textContent = `最近更新: ${fmtTime(updated)}`;
   els.workspaceStagePill.className = `pill tone-${stageTone(stage)}`;
@@ -1594,6 +1748,49 @@ function renderStatus(payload) {
   if (metricsHtml !== state.renderCache.metrics) {
     els.metricGrid.innerHTML = metricsHtml;
     state.renderCache.metrics = metricsHtml;
+  }
+
+  let executionHtml = "";
+  if (execution) {
+    const plannerName = String(execution.planner_name || "").trim();
+    const plannerNotes = Array.isArray(execution.planner_notes) ? execution.planner_notes.filter(Boolean) : [];
+    const recentEvent = execution.recent_event || null;
+    const recentEventText = recentEvent
+      ? `${recentEvent.message || recentEvent.event_type || "最近事件"} · ${compactTime(recentEvent.timestamp)}`
+      : "最近事件会在执行开始后显示在这里。";
+    executionHtml = `
+      <div class="execution-shell">
+        <div class="execution-summary">
+          <article class="metric">
+            <div class="k">规划器</div>
+            <div class="v">${esc(plannerName || "当前任务未记录规划器名称")}</div>
+            <div class="d">${plannerNotes.length ? esc(plannerNotes.join(" · ")) : "这里会显示本次计划的来源和备注。"}</div>
+          </article>
+          <article class="metric">
+            <div class="k">步骤进度</div>
+            <div class="v">${esc(`${execution.completed_steps || 0} / ${execution.total_steps || 0}`)}</div>
+            <div class="d">${esc(`剩余 ${execution.remaining_steps || 0} 步`)}</div>
+          </article>
+        </div>
+        <div class="execution-grid">
+          ${stepSummaryMarkup("当前步骤", execution.current_step, "当前步骤未就绪")}
+          ${stepSummaryMarkup("下一步", execution.next_step, "没有下一步")}
+          ${stepSummaryMarkup("确认边界", execution.pending_confirmation_step, "当前没有确认门")}
+          ${stepSummaryMarkup(execution.failed_step ? "失败步骤" : "最近完成", execution.failed_step || execution.last_completed_step, execution.failed_step ? "暂无失败步骤" : "尚未完成任何步骤")}
+        </div>
+        <div class="execution-event">
+          <div class="k">最近事件</div>
+          <div class="message">${esc(recentEventText)}</div>
+        </div>
+      </div>
+    `;
+  } else {
+    executionHtml = "任务开始后，这里会显示当前步骤、下一步、确认边界和最近事件。";
+  }
+  if (executionHtml !== state.renderCache.execution) {
+    els.executionBox.className = execution ? "" : "empty";
+    els.executionBox.innerHTML = executionHtml;
+    state.renderCache.execution = executionHtml;
   }
   setTiming(activeElapsed, runningNow);
 
@@ -1661,7 +1858,9 @@ function renderStatus(payload) {
   }
 
   let confirmHtml = "";
-  if (confirmation?.required && task?.task_id) {
+  if (agentFailure) {
+    confirmHtml = failureRecoveryMarkup(agentFailure);
+  } else if (confirmation?.required && task?.task_id) {
     const waiting = state.pendingResumeTaskId === task.task_id;
     const reviewKnown = !!state.review && state.review.available;
     const allowConfirm = !reviewKnown || selectedCount > 0;
@@ -1717,6 +1916,7 @@ function clearWorkspace() {
   state.reviewPage = 1;
   state.reviewStatusText = "";
   state.pendingDownloadLaunch = false;
+  clearAgentFailure();
   if (state.reviewSaveTimer) {
     clearTimeout(state.reviewSaveTimer);
     state.reviewSaveTimer = null;
@@ -1724,7 +1924,8 @@ function clearWorkspace() {
   state.reviewSaveInFlight = false;
   state.currentLogsCount = 0;
   state.pendingResumeTaskId = "";
-  state.renderCache = { metrics: "", download: "", entry: "", confirm: "", queue: "", logs: "" };
+  state.graphDebug = null;
+  state.renderCache = { metrics: "", execution: "", graphDebug: "", download: "", entry: "", confirm: "", queue: "", logs: "" };
   stopPolling();
   if (state.statusClockTimer) {
     clearInterval(state.statusClockTimer);
@@ -1735,12 +1936,23 @@ function clearWorkspace() {
   els.workspaceStagePill.className = "pill tone-info";
   els.workspaceStagePill.textContent = "任务准备中";
   els.primaryMessage.textContent = "等待任务开始。";
-  els.workspaceActionsBar.innerHTML = workspaceActionsMarkup({ stage: "planned", selectedCount: 0, downloadEntry: null, hasReview: false });
+  els.workspaceActionsBar.innerHTML = workspaceActionsMarkup({ stage: "planned", selectedCount: 0, downloadEntry: null, hasReview: false, agentFailure: null });
   els.overallTitle.textContent = "等待任务开始";
   els.overallValue.textContent = "0%";
   els.overallFill.style.width = "0%";
   els.overallDetail.textContent = "尚未开始执行。";
   els.metricGrid.innerHTML = '<article class="metric"><div class="k">当前步骤</div><div class="v">-</div><div class="d">暂无步骤信息</div></article>';
+  els.executionBox.className = "empty";
+  els.executionBox.textContent = "任务开始后，这里会显示当前步骤、下一步、确认边界和最近事件。";
+  if (els.graphDebugPanel) els.graphDebugPanel.hidden = true;
+  if (els.graphDebugPill) {
+    els.graphDebugPill.className = "pill tone-neutral";
+    els.graphDebugPill.textContent = "开发模式";
+  }
+  if (els.graphDebugBox) {
+    els.graphDebugBox.className = "empty";
+    els.graphDebugBox.textContent = "仅本地开发模式下显示最近一个 LangGraph checkpoint。";
+  }
   els.confirmWrap.innerHTML = "";
   els.downloadPhase.className = "pill";
   els.downloadPhase.textContent = "未开始";
@@ -1820,6 +2032,9 @@ async function handleUiAction(action, button = null) {
     window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
+  if (action === "go-settings") {
+    return setTab("settings");
+  }
   if (action === "confirm-download") {
     return resumeTask(state.currentTaskId, true);
   }
@@ -1834,6 +2049,18 @@ async function handleUiAction(action, button = null) {
   }
   if (action === "go-status") {
     return setTab("status");
+  }
+  if (action === "retry-run") {
+    return runTask(false);
+  }
+  if (action === "retry-resume") {
+    return resumeTask(state.agentFailure?.taskId || state.currentTaskId || "", false);
+  }
+  if (action === "reload-current-task") {
+    const taskId = state.agentFailure?.taskId || state.currentTaskId || "";
+    const workdir = state.agentFailure?.workdir || state.currentWorkdir || els.workdir.value.trim();
+    if (taskId && workdir) return loadTaskLifecycle(taskId, workdir);
+    return refreshTasks(true);
   }
   if (action === "start-selected-download") {
     return startSelectedDownload();
@@ -2117,6 +2344,7 @@ async function loadTaskLifecycle(taskId, workdir) {
   state.currentTaskId = taskId;
   state.currentWorkdir = workdir;
   state.review = null;
+  state.graphDebug = null;
   state.reviewPage = 1;
   renderReview();
   const payload = await api(`/api/tasks/${encodeURIComponent(taskId)}/lifecycle?workdir=${encodeURIComponent(workdir)}&events_limit=16`);
@@ -2128,8 +2356,12 @@ async function loadTaskLifecycle(taskId, workdir) {
   state.currentWorkdir = workdir;
   state.currentTaskStatus = payload.task?.status || "";
   state.currentLifecycle = payload;
+  if (!["failed", "awaiting_confirmation", "planned"].includes(String(payload.task?.status || "").toLowerCase())) {
+    clearAgentFailure();
+  }
   applyStageFallback(payload);
   renderStatus(payload);
+  await loadGraphDebug(taskId, workdir);
   setActionButtons();
   await loadLogs(true);
   await loadReview(taskId, workdir);
@@ -2157,6 +2389,7 @@ function mergePoll(payload) {
     task,
     summary: payload.summary || previous.summary || null,
     failure: payload.failure || previous.failure || payload.result?.failure || previous.result?.failure || null,
+    execution: payload.execution || previous.execution || task.execution || null,
     focus_summary: payload.focus_summary || previous.focus_summary || null,
     events_tail: payload.events_tail || [],
     download_progress: payload.download_progress || previous.download_progress || null,
@@ -2168,6 +2401,17 @@ function mergePoll(payload) {
     confirmation: payload.confirmation || null,
     download_entry: payload.download_entry || previous.download_entry || null,
   };
+}
+
+async function loadGraphDebug(taskId, workdir) {
+  if (!taskId || !workdir) {
+    state.graphDebug = null;
+    renderGraphDebug();
+    return;
+  }
+  const payload = await api(`/api/tasks/${encodeURIComponent(taskId)}/graph-debug?workdir=${encodeURIComponent(workdir)}`);
+  state.graphDebug = payload.code ? null : payload;
+  renderGraphDebug();
 }
 
 async function pollCurrentTask(taskId, workdir) {
@@ -2256,6 +2500,7 @@ async function runTask(auto = false) {
   const userRequest = els.request.value.trim();
   if (!workdir || !userRequest) return;
   state.currentWorkdir = workdir;
+  clearAgentFailure();
   state.creatingTask = true;
   setActionButtons();
   await saveSettings(false);
@@ -2273,7 +2518,9 @@ async function runTask(auto = false) {
       body: JSON.stringify({ ...runtimePayload(), user_request: userRequest, workdir }),
     });
     if (plan.code) {
+      setAgentFailure("run", plan, { workdir });
       els.workspaceSubtitle.textContent = formatAgentFeedback(plan, "任务创建失败", "当前无法生成可执行计划。");
+      renderStatus(state.currentLifecycle || {});
       return;
     }
     const taskId = plan.task_id || "";
@@ -2302,6 +2549,7 @@ async function resumeTask(taskId = "", auto = true, skipSave = false) {
   if (!skipSave) await saveSettings(false);
   const id = taskId || state.currentTaskId;
   if (!id || state.pendingResumeTaskId === id) return;
+  clearAgentFailure();
   state.pendingResumeTaskId = id;
   state.currentTaskId = id;
   state.currentWorkdir = workdir;
@@ -2319,8 +2567,10 @@ async function resumeTask(taskId = "", auto = true, skipSave = false) {
   }).then(async (response) => {
     if (response.code) {
       stopPolling();
+      setAgentFailure("resume", response, { taskId: id, workdir });
       els.workspaceSubtitle.textContent = formatAgentFeedback(response, "任务恢复失败", "当前任务无法继续恢复执行。");
       await loadTaskLifecycle(id, workdir);
+      renderStatus(state.currentLifecycle || {});
       return;
     }
     state.currentTaskId = response.task_id || id;
