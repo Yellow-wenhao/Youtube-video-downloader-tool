@@ -7,9 +7,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-04-22
+
 ### Changed
-- Consolidated version governance around the repository `VERSION` file and aligned the Windows release workflow to validate tag/version consistency.
-- Rewrote core release-facing documents in clean UTF-8 and clarified historical migration documents as reference-only.
+- Polished the public repository surface by removing internal collaboration documents from the root and tightening the top-level file set.
+- Reworked the README into a clearer product-facing homepage with distinct paths for end users and developers.
+
+### Fixed
+- Prepared a fresh tagged release after the previous `v0.1.4` GitHub release was published without bundled Windows artifacts.
 
 ## [0.1.4] - 2026-04-21
 
@@ -70,6 +75,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Security
 - Clarified legal/compliance usage boundary in project documentation.
 
-[Unreleased]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.5
 [0.1.4]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.4
 [0.1.0]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.0
