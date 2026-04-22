@@ -1,8 +1,6 @@
 # YouTube Downloader
 
-一个 Web-first、本地运行的 YouTube 搜索、审核与下载工具。
-
-当前默认产品形态是浏览器工作台，不再以历史 PySide GUI 作为主入口。
+一个 Web-first、本地运行的 YouTube 搜索、审核与下载工具。  
 
 ## 面向普通用户的使用方式
 
