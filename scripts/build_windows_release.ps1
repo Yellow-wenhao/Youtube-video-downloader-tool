@@ -73,7 +73,7 @@ function Get-RepoVersion() {
 }
 
 if (-not $Version) {
-    $Version = Get-RepoVersion()
+    $Version = Get-RepoVersion
 }
 
 New-Item -ItemType Directory -Path $VendorDir -Force | Out-Null

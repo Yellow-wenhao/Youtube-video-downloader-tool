@@ -7,6 +7,11 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-04-22
+
+### Fixed
+- Fixed a PowerShell syntax error in `scripts/build_windows_release.ps1` that caused the Windows release workflow to fail before packaging.
+
 ## [0.1.5] - 2026-04-22
 
 ### Changed
@@ -75,7 +80,8 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ### Security
 - Clarified legal/compliance usage boundary in project documentation.
 
-[Unreleased]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.6
 [0.1.5]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.5
 [0.1.4]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.4
 [0.1.0]: https://github.com/Yellow-wenhao/Youtube-video-downloader-tool/releases/tag/v0.1.0
