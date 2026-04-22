@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "0.1.0",
+    [string]$Version = "",
     [string]$PythonExe = "",
     [string]$IsccExe = "",
     [switch]$SkipTests,
@@ -22,6 +22,7 @@ $InstallerScript = Join-Path $Root "packaging\windows\installer.iss"
 $ReleaseNotes = Join-Path $Root "docs\WINDOWS_RELEASE.md"
 $Requirements = Join-Path $Root "requirements.txt"
 $ReleaseRequirements = Join-Path $Root "requirements-release.txt"
+$VersionFile = Join-Path $Root "VERSION"
 
 function Write-Step([string]$Message) {
     Write-Host "==> $Message" -ForegroundColor Cyan
@@ -30,6 +31,16 @@ function Write-Step([string]$Message) {
 function Invoke-Download([string]$Url, [string]$Destination) {
     Write-Step "Download $Url"
     Invoke-WebRequest -Uri $Url -OutFile $Destination
+}
+
+function Find-ToolOnPath([string[]]$Names) {
+    foreach ($name in $Names) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd) {
+            return $cmd.Source
+        }
+    }
+    return $null
 }
 
 function Get-RequiredTool([string]$Name) {
@@ -50,6 +61,21 @@ function Resolve-ExistingPath([string]$PathValue, [string]$Label) {
     return (Resolve-Path -LiteralPath $PathValue).Path
 }
 
+function Get-RepoVersion() {
+    if (-not (Test-Path -LiteralPath $VersionFile)) {
+        throw "Missing VERSION file: $VersionFile"
+    }
+    $value = (Get-Content -LiteralPath $VersionFile -Raw).Trim()
+    if (-not $value) {
+        throw "VERSION file is empty: $VersionFile"
+    }
+    return $value
+}
+
+if (-not $Version) {
+    $Version = Get-RepoVersion()
+}
+
 New-Item -ItemType Directory -Path $VendorDir -Force | Out-Null
 New-Item -ItemType Directory -Path $BuildDir -Force | Out-Null
 Remove-Item -LiteralPath $PortableDir -Recurse -Force -ErrorAction SilentlyContinue
@@ -66,6 +92,9 @@ Write-Step "Install packaging dependencies"
 if (-not $SkipTests) {
     Write-Step "Run baseline tests"
     & $Python -m unittest discover -s (Join-Path $Root "tests") -p "test_app_paths.py"
+    & $Python -m unittest discover -s (Join-Path $Root "tests") -p "test_release_launcher.py"
+    & $Python -m unittest discover -s (Join-Path $Root "tests") -p "test_release_runtime.py"
+    & $Python -m unittest discover -s (Join-Path $Root "tests") -p "test_web_agent_runtime_api.py"
     & $Python -m unittest discover -s (Join-Path $Root "tests") -p "test_web_workspace_smoke.py"
 }
 
@@ -73,18 +102,33 @@ $YtDlpExe = Join-Path $VendorDir "yt-dlp.exe"
 $FfmpegZip = Join-Path $BuildDir "ffmpeg-release-essentials.zip"
 $FfmpegExtract = Join-Path $BuildDir "ffmpeg-release"
 
-Invoke-Download "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" $YtDlpExe
-Invoke-Download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" $FfmpegZip
-
-Remove-Item -LiteralPath $FfmpegExtract -Recurse -Force -ErrorAction SilentlyContinue
-Expand-Archive -Path $FfmpegZip -DestinationPath $FfmpegExtract -Force
-$FfmpegBin = Get-ChildItem -Path $FfmpegExtract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
-$FfprobeBin = Get-ChildItem -Path $FfmpegExtract -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
-if (-not $FfmpegBin -or -not $FfprobeBin) {
-    throw "Could not find ffmpeg.exe / ffprobe.exe in extracted archive"
+if (-not (Test-Path -LiteralPath $YtDlpExe)) {
+    Invoke-Download "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe" $YtDlpExe
 }
-Copy-Item -LiteralPath $FfmpegBin.FullName -Destination (Join-Path $VendorDir "ffmpeg.exe") -Force
-Copy-Item -LiteralPath $FfprobeBin.FullName -Destination (Join-Path $VendorDir "ffprobe.exe") -Force
+
+$VendorFfmpeg = Join-Path $VendorDir "ffmpeg.exe"
+$VendorFfprobe = Join-Path $VendorDir "ffprobe.exe"
+if (-not ((Test-Path -LiteralPath $VendorFfmpeg) -and (Test-Path -LiteralPath $VendorFfprobe))) {
+    $SystemFfmpeg = Find-ToolOnPath @("ffmpeg.exe", "ffmpeg")
+    $SystemFfprobe = Find-ToolOnPath @("ffprobe.exe", "ffprobe")
+    if ($SystemFfmpeg -and $SystemFfprobe) {
+        Write-Step "Reuse local ffmpeg binaries from PATH"
+        Copy-Item -LiteralPath $SystemFfmpeg -Destination $VendorFfmpeg -Force
+        Copy-Item -LiteralPath $SystemFfprobe -Destination $VendorFfprobe -Force
+    }
+    else {
+        Invoke-Download "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" $FfmpegZip
+        Remove-Item -LiteralPath $FfmpegExtract -Recurse -Force -ErrorAction SilentlyContinue
+        Expand-Archive -Path $FfmpegZip -DestinationPath $FfmpegExtract -Force
+        $FfmpegBin = Get-ChildItem -Path $FfmpegExtract -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1
+        $FfprobeBin = Get-ChildItem -Path $FfmpegExtract -Recurse -Filter "ffprobe.exe" | Select-Object -First 1
+        if (-not $FfmpegBin -or -not $FfprobeBin) {
+            throw "Could not find ffmpeg.exe / ffprobe.exe in extracted archive"
+        }
+        Copy-Item -LiteralPath $FfmpegBin.FullName -Destination $VendorFfmpeg -Force
+        Copy-Item -LiteralPath $FfprobeBin.FullName -Destination $VendorFfprobe -Force
+    }
+}
 
 Write-Step "Build launcher"
 & $Python -m PyInstaller --noconfirm --clean $PyInstallerLauncherSpec
@@ -114,6 +158,17 @@ if (-not $SkipInstaller) {
         $Iscc = Get-Command "iscc.exe" -ErrorAction SilentlyContinue
         if ($Iscc) {
             $ResolvedIscc = $Iscc.Source
+        }
+    }
+    if (-not $ResolvedIscc) {
+        foreach ($candidate in @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe"
+        )) {
+            if (Test-Path -LiteralPath $candidate) {
+                $ResolvedIscc = $candidate
+                break
+            }
         }
     }
     if (-not $ResolvedIscc) {

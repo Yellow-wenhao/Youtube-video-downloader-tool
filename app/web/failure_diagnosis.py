@@ -144,7 +144,7 @@ def _classify_failure(
         return {
             "category": "download_environment",
             "title": "下载环境不可用",
-            "summary": "任务已经进入下载阶段，但本机当前缺少可用的下载工具或工具路径不可访问。",
+            "summary": "任务已经进入下载阶段，但本机当前缺少可用的下载工具，或工具路径不可访问。",
             "recovery": "请检查 yt-dlp 和 ffmpeg 是否已正确安装，并确认当前配置里的二进制路径有效后再重试。",
             "actions": ["检查 yt-dlp", "检查 ffmpeg", "重试下载"],
         }

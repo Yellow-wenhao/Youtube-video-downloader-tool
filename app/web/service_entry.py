@@ -13,6 +13,7 @@ from app.core.app_paths import (
     APP_VERSION_ENV,
     RUNTIME_MODE_ENV,
     RUNTIME_PORT_ENV,
+    app_version,
     web_service_log_path,
 )
 
@@ -44,7 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Background web service entrypoint for YouTube Downloader")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--version", default=os.environ.get(APP_VERSION_ENV, "0.1.0"))
+    parser.add_argument("--version", default=app_version())
     args = parser.parse_args(argv)
 
     os.environ[RUNTIME_MODE_ENV] = "release"

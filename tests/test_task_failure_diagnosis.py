@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import unittest
-from datetime import datetime, timezone
-from pathlib import Path
-import sys
 import shutil
+import sys
+import unittest
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.agent.runner import AgentRunner
-from app.agent.session_store import SessionStore
 from app.core.models import StepStatus, TaskResult, TaskSpec, TaskStatus, TaskStep
 from app.core.task_service import TaskStore
 from app.web.failure_diagnosis import build_task_failure_diagnosis
@@ -122,13 +121,12 @@ class TaskFailureDiagnosisTests(unittest.TestCase):
         with _workspace_tempdir() as tmp:
             workdir = Path(tmp)
             store = TaskStore(workdir)
-            session = SessionStore(workdir)
             runner = AgentRunner(registry=_DummyRegistry())
             task = self._task(workdir, status=TaskStatus.PLANNED, payload={"items_path": "{{steps.search.output_path}}"})
             task.steps[0].status = StepStatus.PENDING
             store.save_task(task)
 
-            result = runner.execute_task(task, store, session, auto_confirm=True)
+            result = runner.resume(workdir, task_id=task.task_id, auto_confirm=True)
             failure = build_task_failure_diagnosis(task, result)
 
             self.assertEqual(result.status, TaskStatus.FAILED)

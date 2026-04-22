@@ -20,6 +20,7 @@ from app.core.app_paths import (
     RELEASE_SERVICE_EXE_NAME,
     RUNTIME_MODE_ENV,
     RUNTIME_PORT_ENV,
+    app_version,
     is_frozen_app,
     project_root,
     runtime_metadata_path,
@@ -129,7 +130,7 @@ def _open_browser(url: str) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Launch the local YouTube Downloader web workspace")
-    parser.add_argument("--version", default=os.environ.get(APP_VERSION_ENV, "0.1.0"))
+    parser.add_argument("--version", default=app_version())
     args = parser.parse_args(argv)
 
     alive, existing_url = _is_existing_runtime_alive()

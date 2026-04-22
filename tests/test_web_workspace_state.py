@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import os
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
+from app.agent.langgraph_runtime import GraphCheckpointStore
 from app.agent.session_store import SessionStore
 from app.core.models import TaskDownloadProgress, TaskResult, TaskSpec, TaskStatus, TaskStep, StepStatus
 from app.core.task_service import TaskStore
@@ -99,6 +102,17 @@ class WorkspaceStateApiTests(unittest.TestCase):
         response = self.client.get(f"/api/tasks/{task_id}/poll", params={"workdir": str(self.workdir)})
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
+
+    def _save_checkpoint(self, task_id: str, *, planner_name: str = "llm", planner_notes: list[str] | None = None) -> None:
+        GraphCheckpointStore(self.workdir).save(
+            task_id,
+            "plan_request",
+            {
+                "task_id": task_id,
+                "planner_name": planner_name,
+                "planner_notes": list(planner_notes or []),
+            },
+        )
 
     def _assert_stage_snapshot(
         self,
@@ -218,6 +232,10 @@ class WorkspaceStateApiTests(unittest.TestCase):
                 self.assertEqual(lifecycle["download_entry"]["ready"], case["expected_ready"])
                 self.assertEqual(poll["download_entry"]["ready"], case["expected_ready"])
                 self.assertEqual(lifecycle["download_entry"]["path"], poll["download_entry"]["path"])
+                self.assertIn("execution", lifecycle)
+                self.assertIn("execution", poll)
+                self.assertEqual(lifecycle["execution"]["current_step"]["step_id"], "download_step")
+                self.assertEqual(poll["execution"]["current_step"]["step_id"], "download_step")
 
     def test_completed_stage_prefers_session_dir_for_download_entry(self) -> None:
         session_dir = self.download_dir / "task-output"
@@ -373,6 +391,80 @@ class WorkspaceStateApiTests(unittest.TestCase):
         self.assertIsNotNone(poll.get("failure"))
         self.assertFalse(lifecycle.get("confirmation"))
         self.assertFalse(poll.get("confirmation"))
+
+    def test_execution_insight_exposes_checkpoint_and_recent_event(self) -> None:
+        task = self._create_task(
+            task_id="execution-insight",
+            task_status=TaskStatus.RUNNING,
+            step_status=StepStatus.RUNNING,
+            tool_name="search_videos",
+        )
+        self.store.append_event(task.task_id, "planner_note", "LLM planner selected search strategy", data={"planner": "llm"})
+        self._save_checkpoint(
+            task.task_id,
+            planner_name="llm",
+            planner_notes=["using langgraph runtime", "download requires confirmation"],
+        )
+
+        lifecycle = self._get_lifecycle(task.task_id)
+        poll = self._get_poll(task.task_id)
+
+        self.assertEqual(lifecycle["execution"]["planner_name"], "llm")
+        self.assertEqual(poll["execution"]["planner_name"], "llm")
+        self.assertEqual(lifecycle["execution"]["planner_notes"][0], "using langgraph runtime")
+        self.assertEqual(lifecycle["execution"]["current_step"]["tool_name"], "search_videos")
+        self.assertEqual(lifecycle["execution"]["recent_event"]["event_type"], "planner_note")
+        self.assertEqual(poll["execution"]["recent_event"]["message"], "LLM planner selected search strategy")
+        self.assertEqual(lifecycle["task"]["execution"]["planner_name"], "llm")
+
+    def test_graph_debug_endpoint_is_hidden_by_default(self) -> None:
+        task = self._create_task(
+            task_id="graph-debug-off",
+            task_status=TaskStatus.RUNNING,
+            step_status=StepStatus.RUNNING,
+            tool_name="search_videos",
+        )
+        response = self.client.get(f"/api/tasks/{task.task_id}/graph-debug", params={"workdir": str(self.workdir)})
+        self.assertEqual(response.status_code, 404, response.text)
+
+    def test_graph_debug_endpoint_returns_checkpoint_snapshot_when_enabled(self) -> None:
+        task = self._create_task(
+            task_id="graph-debug-on",
+            task_status=TaskStatus.RUNNING,
+            step_status=StepStatus.RUNNING,
+            tool_name="search_videos",
+        )
+        GraphCheckpointStore(self.workdir).save(
+            task.task_id,
+            "resolve_step_payload",
+            {
+                "task_id": task.task_id,
+                "planner_name": "llm",
+                "planner_notes": ["dev trace enabled"],
+                "selected_step_id": "download_step",
+                "selected_step_index": 0,
+                "pending_step_id": "",
+                "failure_origin": "",
+                "last_error": {},
+                "resolved_payloads": {"download_step": {"q": "demo"}},
+                "step_results": {"search": {"count": 3}},
+                "runtime_defaults": {"workdir": str(self.workdir), "llm_model": "gpt-5.4"},
+            },
+        )
+
+        with patch.dict(os.environ, {"YTBDLP_ENABLE_GRAPH_DEBUG": "1"}, clear=False):
+            response = self.client.get(f"/api/tasks/{task.task_id}/graph-debug", params={"workdir": str(self.workdir)})
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertTrue(payload["enabled"])
+        self.assertEqual(payload["task_id"], task.task_id)
+        self.assertEqual(payload["node_name"], "resolve_step_payload")
+        self.assertEqual(payload["planner_name"], "llm")
+        self.assertEqual(payload["planner_notes"], ["dev trace enabled"])
+        self.assertEqual(payload["selected_step_id"], "download_step")
+        self.assertEqual(payload["step_result_keys"], ["search"])
+        self.assertEqual(payload["resolved_payload_keys"], ["download_step"])
 
 
 if __name__ == "__main__":

@@ -1,0 +1,6 @@
+# Development and test environment baseline.
+# Keep runtime dependencies in requirements.txt so LangGraph/FastAPI are always
+# installed for local agent/web/test workflows.
+-r requirements.txt
+
+# Add developer-only packages here when needed.

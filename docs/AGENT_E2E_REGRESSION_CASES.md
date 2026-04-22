@@ -9,7 +9,7 @@ Use these cases after changing any of the following:
 - `app/agent/llm_planner.py`
 - `app/agent/runner.py`
 - `app/gui/agent_bridge.py`
-- `gui_app.py`
+- `gui_app.py` when a change explicitly targets the legacy desktop shell
 
 ## Source of Truth
 
@@ -21,7 +21,7 @@ Structured fixture:
 
 For each case:
 
-1. Fill Provider, Base URL, Model, and API Key in the GUI.
+1. Fill Provider, Base URL, Model, and API Key in the legacy GUI.
 2. Click `测试连接` first.
 3. Submit the request in the Agent page.
 4. Verify:
