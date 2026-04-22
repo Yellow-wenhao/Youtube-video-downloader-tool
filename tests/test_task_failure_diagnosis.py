@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import unittest
-from datetime import datetime, timezone
-from pathlib import Path
-import sys
 import shutil
+import sys
+import unittest
 import uuid
 from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app.agent.runner import AgentRunner
-from app.agent.session_store import SessionStore
 from app.core.models import StepStatus, TaskResult, TaskSpec, TaskStatus, TaskStep
 from app.core.task_service import TaskStore
 from app.web.failure_diagnosis import build_task_failure_diagnosis

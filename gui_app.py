@@ -1,5 +1,12 @@
 ﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+"""Legacy desktop compatibility surface.
+
+The browser workspace under app/web/ is the primary product shell.
+This module is kept only for legacy access, migration reference, and
+targeted compatibility fixes.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -2726,7 +2733,7 @@ class MainWindow(QtWidgets.QMainWindow):
             6000,
         )
         self._set_maint_buttons_enabled(True)
-        if self.maint_action_name in {"检查版本", "妫€鏌ョ増鏈?", "更新 yt-dlp", "更新 ffmpeg"}:
+        if self.maint_action_name in {"检查版本", "更新 yt-dlp", "更新 ffmpeg"}:
             self._check_tools_after_maint()
 
     def _check_tools_after_maint(self) -> None:

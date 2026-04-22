@@ -18,8 +18,8 @@ The first version should let a user say things like:
 
 The agent should interpret intent, assemble parameters, invoke tools, track state, and summarize outcomes.
 
-The current repository has already proven that a rule shell can orchestrate tools, but that is now transitional only.
-The default planning path should be LLM-first, with the previous regex planner available only as an explicit compatibility fallback.
+The current repository has already proven that a rule shell can orchestrate tools, but that path has now been retired.
+The default planning path is LLM-first, without keeping the previous regex planner as a runtime fallback.
 
 ## 2. Recommended First Release Shape
 
@@ -262,11 +262,11 @@ The first `context_provider` should not use vector search. It can simply expose:
 - last used resolution/concurrency values
 - recent failure summaries
 
-The previous regex planner should remain in a separate legacy module during migration so that:
+The previous regex planner was kept in a separate legacy module during migration so that:
 
-- the default runtime no longer pretends heuristic parsing is a true agent
-- compatibility remains available for controlled fallback
-- the new LLM runtime can replace planning without rewriting execution
+- the default runtime no longer pretended heuristic parsing was a true agent
+- the new LLM runtime could replace planning without rewriting execution
+- the compatibility path could be removed cleanly once the Web-first runtime stabilized
 
 ### Step G: Integrate with the GUI
 
@@ -299,7 +299,7 @@ From the historical compatibility wrapper:
 - `download_option_args`, `download_selected`
   - move toward `download_service`
 - `parse_args`, `main`
-  - keep in `youtube_batch_compat.py` as compatibility wrapper
+  - keep in `youtube_batch.py` as the thin CLI adapter
 
 From `gui_app.py`:
 
@@ -356,6 +356,6 @@ If implementation starts now, the safest first coding slice is:
 2. add `app/core/models.py`
 3. extract `yt_dlp_base`, `ensure_binary`, `run_command` into adapters
 4. extract `search_candidates` and `fetch_detail_metadata`
-5. make `youtube_batch_compat.py` call the extracted services
+5. keep `youtube_batch.py` as the thin CLI adapter over extracted services
 
 This gives the project a real architectural seam without forcing a risky full rewrite.

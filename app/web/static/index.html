@@ -3,15 +3,14 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>YouTube Downloader Workspace</title>
+  <title>YouTube 下载工作台</title>
   <link rel="stylesheet" href="/static/workspace.css" />
 </head>
 <body>
   <main class="shell">
     <section class="hero">
-      <div class="eyebrow">Local Workspace</div>
-      <h1>YouTube Downloader 下载工作区</h1>
-      <p>创建任务，审核候选，开始下载，然后查看结果。页面只保留用户真正要做的事，不再让内部产物和诊断信息占据主视图。</p>
+      <div class="eyebrow">本地工作台</div>
+      <h1>YouTube 下载工作台</h1>
     </section>
 
     <section class="layout">
@@ -19,91 +18,83 @@
         <section class="card composer-card">
           <div class="head">
             <h2>任务输入</h2>
-            <div class="subtle">把主要输入收敛到自然语言请求，连接细节和模型切换放进高级区域，减少首次使用的阻力。</div>
           </div>
           <div class="composer-intro">
             <div>
               <strong>先描述你要下载什么</strong>
-              <div class="subtle">常规流程只需要工作区、API Key 和自然语言请求。Provider、模型、Base URL 放到“高级连接设置”里按需调整。</div>
             </div>
-            <span class="pill tone-info">主操作: 运行任务</span>
           </div>
-            <div class="grid2">
-              <div class="field">
-                <label for="workdir">Workdir</label>
-                <input id="workdir" placeholder="首次加载时会自动填入当前系统推荐工作区" />
-              <div class="note">任务记录、审核结果和下载会话会统一保存在这个工作区。</div>
+          <div class="grid2">
+            <div class="field">
+              <label for="workdir">工作区</label>
+              <input id="workdir" placeholder="输入或选择工作区" />
             </div>
             <div class="field">
               <label for="apiKey">API Key</label>
               <input id="apiKey" type="password" placeholder="输入 API Key" />
-              <div class="note">API Key 保留在当前页面会话中，用于测试连接与运行任务。</div>
             </div>
-              <div class="field span2">
-                <label for="request">User Request</label>
-                <textarea id="request" placeholder="例如：帮我找 2024 年后的 Tesla Model 3 review，先筛选候选视频，审核后再下载 5 个高质量视频"></textarea>
-                <div class="note">写清主题、时间范围、数量要求，以及是否需要人工确认，Agent 会按这个目标生成任务。</div>
-              </div>
+            <div class="field span2">
+              <label for="request">任务请求</label>
+              <textarea id="request" placeholder="描述你要搜索、筛选或下载的内容"></textarea>
             </div>
-            <section class="request-templates">
-              <div class="section">
-                <h3>快速模板</h3>
-                <span class="pill" id="requestTemplateHint">点击填入后再改主题即可</span>
-              </div>
-              <div class="template-chips" id="requestTemplateChips">
-                <button class="chip-btn active" type="button" data-request-template="review">先筛选再下载</button>
-                <button class="chip-btn" type="button" data-request-template="compare">对比评测</button>
-                <button class="chip-btn" type="button" data-request-template="clips">素材剪辑</button>
-                <button class="chip-btn" type="button" data-request-template="audio">只要音频</button>
-              </div>
-              <div class="request-template-grid" id="requestTemplateGrid">
-                <article class="request-template-card active" data-request-template-card="review">
-                  <div class="request-template-head">
-                    <strong>审核型下载</strong>
-                    <span class="pill tone-info">推荐起手</span>
-                  </div>
-                  <p>适合大多数任务，先让 Agent 搜索和筛选候选视频，再由你审核后开始下载。</p>
-                  <div class="request-template-example">帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。</div>
-                  <div class="mini-actions">
-                    <button class="btn2" type="button" data-request-template-apply="帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。">填入这个模板</button>
-                  </div>
-                </article>
-                <article class="request-template-card" data-request-template-card="compare">
-                  <div class="request-template-head">
-                    <strong>对比评测</strong>
-                    <span class="pill">适合横评</span>
-                  </div>
-                  <p>适合产品对比、车型横评、工具评测等需要限定时间范围和结果数量的任务。</p>
-                  <div class="request-template-example">帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。</div>
-                  <div class="mini-actions">
-                    <button class="btn2" type="button" data-request-template-apply="帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。">填入这个模板</button>
-                  </div>
-                </article>
-                <article class="request-template-card" data-request-template-card="clips">
-                  <div class="request-template-head">
-                    <strong>素材剪辑</strong>
-                    <span class="pill">适合找 B-roll</span>
-                  </div>
-                  <p>适合收集某个主题的可用素材，强调画面质量、时长和下载数量。</p>
-                  <div class="request-template-example">帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。</div>
-                  <div class="mini-actions">
-                    <button class="btn2" type="button" data-request-template-apply="帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。">填入这个模板</button>
-                  </div>
-                </article>
-                <article class="request-template-card" data-request-template-card="audio">
-                  <div class="request-template-head">
-                    <strong>只保留音频</strong>
-                    <span class="pill">适合播客 / 访谈</span>
-                  </div>
-                  <p>适合访谈、播客、演讲等只关心音频内容的任务，后续可配合设置页切到音频模式。</p>
-                  <div class="request-template-example">帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。</div>
-                  <div class="mini-actions">
-                    <button class="btn2" type="button" data-request-template-apply="帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。">填入这个模板</button>
-                  </div>
-                </article>
-              </div>
-            </section>
-            <details class="advanced-panel" id="taskInputAdvanced">
+          </div>
+
+          <section class="request-templates">
+            <div class="section">
+              <h3>快速模板</h3>
+              <span class="pill" id="requestTemplateHint">点击填入后再改主题即可</span>
+            </div>
+            <div class="template-chips" id="requestTemplateChips">
+              <button class="chip-btn active" type="button" data-request-template="review">先筛选再下载</button>
+              <button class="chip-btn" type="button" data-request-template="compare">对比评测</button>
+              <button class="chip-btn" type="button" data-request-template="clips">素材剪辑</button>
+              <button class="chip-btn" type="button" data-request-template="audio">只要音频</button>
+            </div>
+            <div class="request-template-grid" id="requestTemplateGrid">
+              <article class="request-template-card active" data-request-template-card="review">
+                <div class="request-template-head">
+                  <strong>审核型下载</strong>
+                  <span class="pill tone-info">推荐起手</span>
+                </div>
+                <div class="request-template-example">帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。</div>
+                <div class="mini-actions">
+                  <button class="btn2" type="button" data-request-template-apply="帮我找 2024 年后的 Tesla Model 3 review，优先英文高质量评测视频，先给我候选列表审核，再下载 5 个最合适的视频。">填入这个模板</button>
+                </div>
+              </article>
+              <article class="request-template-card" data-request-template-card="compare">
+                <div class="request-template-head">
+                  <strong>对比评测</strong>
+                  <span class="pill">适合横评</span>
+                </div>
+                <div class="request-template-example">帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。</div>
+                <div class="mini-actions">
+                  <button class="btn2" type="button" data-request-template-apply="帮我找 iPhone 16 Pro 和 Samsung S25 Ultra 的详细对比评测，优先 2025 年发布的视频，先筛选 12 个候选，再让我确认下载其中 4 个最完整的视频。">填入这个模板</button>
+                </div>
+              </article>
+              <article class="request-template-card" data-request-template-card="clips">
+                <div class="request-template-head">
+                  <strong>素材剪辑</strong>
+                  <span class="pill">适合找 B-roll</span>
+                </div>
+                <div class="request-template-example">帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。</div>
+                <div class="mini-actions">
+                  <button class="btn2" type="button" data-request-template-apply="帮我找东京城市街景夜景 4K 素材，优先横屏、无解说、画面稳定的视频，先筛选出适合剪辑的候选，确认后下载 8 个。">填入这个模板</button>
+                </div>
+              </article>
+              <article class="request-template-card" data-request-template-card="audio">
+                <div class="request-template-head">
+                  <strong>只保留音频</strong>
+                  <span class="pill">适合播客 / 访谈</span>
+                </div>
+                <div class="request-template-example">帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。</div>
+                <div class="mini-actions">
+                  <button class="btn2" type="button" data-request-template-apply="帮我找关于 AI agent engineering 的高质量英文访谈或播客，时长 20 分钟以上，先给我候选审核，再下载 6 个并保留音频版本。">填入这个模板</button>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <details class="advanced-panel" id="taskInputAdvanced">
             <summary>
               <div class="advanced-copy">
                 <strong>高级连接设置</strong>
@@ -131,7 +122,7 @@
                   <input id="baseUrl" placeholder="https://api.openai.com/v1" />
                 </div>
                 <div class="field">
-                  <label for="modelSelect">Model</label>
+                  <label for="modelSelect">模型</label>
                   <select id="modelSelect"></select>
                   <input id="modelManual" placeholder="手动输入模型名称，例如 gpt-5.4" hidden />
                 </div>
@@ -140,10 +131,9 @@
                   <div class="advanced-actions">
                     <button class="btn2" id="btnTest" type="button">测试连接</button>
                   </div>
-                  <div class="note">只有在切换 provider、模型或 Base URL 后，才需要手动做连接检查。</div>
                 </div>
                 <div class="field span2">
-                  <div class="note" id="modelSuggestion">建议模型: -</div>
+                  <div class="note" id="modelSuggestion">建议模型：-</div>
                 </div>
               </div>
             </div>
@@ -157,7 +147,6 @@
         <section class="card">
           <div class="head">
             <h2>任务队列</h2>
-            <div class="subtle">聚焦当前任务、待确认任务和最近完成任务。</div>
           </div>
           <div class="queue-tools">
             <div class="queue-pills" id="queuePills"></div>
@@ -209,7 +198,7 @@
               <div class="w-sub" id="workspaceSubtitle">运行或选择一个任务后，这里会显示当前阶段、下载进度、日志以及下载入口。</div>
             </div>
             <div class="pills">
-              <span class="pill tone-info" id="statusPill">阶段: 未开始</span>
+              <span class="pill tone-info" id="statusPill">阶段：未开始</span>
               <span class="pill" id="taskIdPill">Task: -</span>
             </div>
           </header>
@@ -230,7 +219,7 @@
                   <section class="inner">
                     <div class="section">
                       <h3>任务阶段</h3>
-                      <span class="pill" id="updatedPill">最近更新: -</span>
+                      <span class="pill" id="updatedPill">最近更新：-</span>
                     </div>
                     <div class="stage-callout">
                       <div class="stage-row">
@@ -299,7 +288,6 @@
             <div class="section panel-head">
               <div>
                 <h3>视频审核与勾选下载</h3>
-                <div class="subtle">保留要下载的视频，去掉不需要的候选。</div>
               </div>
               <div class="mini-actions">
                 <span class="pill" id="reviewStatusPill">未加载</span>
@@ -328,7 +316,7 @@
                       <option value="selected">已选中</option>
                       <option value="agent_selected">Agent 推荐</option>
                       <option value="manual_review">需复核</option>
-                      <option value="low_similarity">低相似</option>
+                      <option value="low_similarity">低相似度</option>
                       <option value="modified">手动改动</option>
                     </select>
                   </div>
@@ -370,7 +358,6 @@
             <div class="section panel-head">
               <div>
                 <h3>已下载视频</h3>
-                <div class="subtle">优先展示最近下载结果和视频封面，直接打开视频或目录，不让内部产物占据主视图。</div>
               </div>
               <div class="mini-actions">
                 <span class="pill" id="resultsStatusPill">未加载</span>
@@ -449,7 +436,6 @@
             <form class="scroll" id="settingsForm">
               <section class="inner settings-card">
                 <div class="section"><h3>下载默认设置</h3></div>
-                <div class="subtle">这些设置会保存到当前 workdir 的 <code>.agent/session.json</code> 默认项中，后续 run / resume 会自动读取。</div>
                 <section class="settings-overview" aria-live="polite">
                   <div class="settings-overview-copy">
                     <div class="settings-overview-title">当前默认策略</div>
@@ -471,7 +457,6 @@
                   <div class="settings-block-head">
                     <div>
                       <h4>常用设置</h4>
-                      <p>先确定下载位置和下载模式，常用项保持默认即可快速开始。</p>
                     </div>
                   </div>
                   <div class="grid2 settings-core-grid">

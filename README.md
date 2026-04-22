@@ -32,7 +32,7 @@ Release 内置：
 - `app/web/static/`
   - 浏览器工作台
 - `gui_app.py`
-  - legacy 兼容入口，只保留迁移参考与必要修复
+  - legacy 桌面兼容壳，不再作为默认产品入口
 - `youtube_batch.py`
   - 兼容 CLI 入口
 

@@ -14,53 +14,53 @@ ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from app.core.cli_pipeline_service import BatchCliOptions, run_batch_cli
 from app.core.app_paths import default_download_dir, default_workdir
+from app.core.cli_pipeline_service import BatchCliOptions, run_batch_cli
 
 
 def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="按关键词搜索 YouTube，元数据筛选后可选批量下载（主题由 --topic-phrase 指定）"
+        description="按关键词搜索 YouTube，并在元数据筛选后按需执行批量下载（主题短语通过 --topic-phrase 指定）。"
     )
     parser.add_argument("--binary", default="yt-dlp", help="yt-dlp 可执行文件名或路径")
-    parser.add_argument("--query-file", type=Path, help="关键词文件，每行一个搜索词，# 行为注释")
+    parser.add_argument("--query-file", type=Path, help="关键词文件，每行一个搜索词，支持以 # 开头的注释行")
     parser.add_argument(
         "--query-text",
         action="append",
         default=[],
-        help="直接输入查询词（可重复传入；若提供则优先于 --query-file）",
+        help="直接输入查询词，可重复传入；提供后会优先于 --query-file",
     )
     parser.add_argument("--workdir", type=Path, default=default_workdir(), help="中间结果输出目录")
     parser.add_argument("--download-dir", type=Path, default=default_download_dir(), help="视频下载目录")
     parser.add_argument("--search-limit", type=int, default=50, help="每个关键词抓取的搜索结果条数")
-    parser.add_argument("--metadata-workers", type=int, default=1, help="第 2 步元数据抓取并发数（1=串行）")
-    parser.add_argument("--min-duration", type=int, default=120, help="最低时长（秒），低于则降分且通常不入选")
+    parser.add_argument("--metadata-workers", type=int, default=1, help="第 2 步元数据抓取并发数（1 表示串行）")
+    parser.add_argument("--min-duration", type=int, default=120, help="最低时长（秒），低于该值会降分且通常不入选")
     parser.add_argument(
         "--topic-phrase",
         default="",
-        help="可选：主题匹配短语（为空时不按主题词过滤）",
+        help="可选：主题匹配短语；为空时不按主题短语过滤",
     )
     parser.add_argument(
         "--year-from",
         type=int,
         default=None,
         metavar="Y",
-        help="仅保留上传年份 >= Y（需元数据 upload_date，与 --year-to 可配合分批按年抓）",
+        help="仅保留上传年份 >= Y 的候选；需要 upload_date，可与 --year-to 配合分批抓取",
     )
-    parser.add_argument("--year-to", type=int, default=None, metavar="Y", help="仅保留上传年份 <= Y")
+    parser.add_argument("--year-to", type=int, default=None, metavar="Y", help="仅保留上传年份 <= Y 的候选")
     parser.add_argument(
         "--lang-rules",
         choices=("en", "my", "both"),
         default="both",
-        help="兼容保留参数（当前筛选不再使用意图词/排除词词表）",
+        help="兼容保留参数；当前筛选已不再依赖意图词或排除词词表",
     )
     parser.add_argument(
         "--full-csv",
         action="store_true",
-        help="额外写出 04_all_scored.csv（全部候选打分行，便于清洗数据集）",
+        help="额外输出 04_all_scored.csv（包含全部候选打分行，便于清洗数据集）",
     )
     parser.add_argument("--download", action="store_true", help="对入选 URL 执行下载")
-    parser.add_argument("--cookies-from-browser", help="例如 chrome, firefox, edge")
+    parser.add_argument("--cookies-from-browser", help="例如 chrome、firefox、edge")
     parser.add_argument("--cookies-file", help="Netscape 格式 cookies 文件路径")
     parser.add_argument(
         "--download-from-urls-file",
@@ -71,13 +71,13 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument(
         "--yt-extra-args",
         default="",
-        help="透传给 yt-dlp 的附加参数字符串，例如: --proxy http://127.0.0.1:7890 --retries 20",
+        help="透传给 yt-dlp 的附加参数字符串，例如 --proxy http://127.0.0.1:7890 --retries 20",
     )
     parser.add_argument(
         "--download-mode",
         choices=("video", "audio"),
         default="video",
-        help="下载模式：video 视频（默认）或 audio 仅音频",
+        help="下载模式：video 为视频（默认），audio 为仅音频",
     )
     parser.add_argument(
         "--include-audio",
@@ -96,7 +96,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         type=int,
         default=None,
         metavar="H",
-        help="固定下载分辨率高度，如 1080",
+        help="限制下载分辨率高度，例如 1080",
     )
     parser.add_argument(
         "--max-bitrate-kbps",
@@ -109,7 +109,7 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         "--audio-format",
         choices=("best", "mp3", "m4a", "opus", "wav", "flac"),
         default="best",
-        help="音频格式（audio 模式下生效）",
+        help="音频格式（仅在 audio 模式下生效）",
     )
     parser.add_argument(
         "--audio-quality",
@@ -117,20 +117,20 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
         default=None,
         choices=range(0, 11),
         metavar="Q",
-        help="音频质量 0-10（audio 模式下生效，0 最佳）",
+        help="音频质量 0-10（仅在 audio 模式下生效，0 为最高）",
     )
     parser.add_argument(
         "--sponsorblock-remove",
         default="",
-        help="SponsorBlock 移除类别（逗号分隔），例如 sponsor,selfpromo,intro,outro,interaction",
+        help="SponsorBlock 移除类别，逗号分隔，例如 sponsor,selfpromo,intro,outro,interaction",
     )
     parser.add_argument(
         "--clean-video",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="纯净模式：自动移除常见广告/赞助片段（YouTube 有效）",
+        help="纯净模式：自动移除常见广告和赞助片段（仅对 YouTube 有效）",
     )
-    parser.add_argument("--concurrent-videos", type=int, default=3, help="并发下载视频数（1=串行）")
+    parser.add_argument("--concurrent-videos", type=int, default=3, help="并发下载视频数（1 表示串行）")
     parser.add_argument("--concurrent-fragments", type=int, default=8, help="单视频分片并发数（yt-dlp -N）")
     parser.add_argument(
         "--download-session-name",

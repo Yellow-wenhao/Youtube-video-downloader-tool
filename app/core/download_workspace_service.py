@@ -15,7 +15,6 @@ SCORED_ITEMS_FILENAME = "03_scored_candidates.jsonl"
 DOWNLOAD_ARCHIVE_FILENAME = "download_archive.txt"
 FAILED_URLS_FILENAME = "06_failed_urls.txt"
 DOWNLOAD_REPORT_FILENAME = "07_download_report.csv"
-LAST_SESSION_FILENAME = "08_last_download_session.txt"
 SESSION_METADATA_FILENAME = "09_download_session.json"
 
 
@@ -42,7 +41,6 @@ class DownloadWorkspacePaths:
     items_path: Path
     archive_file: Path
     failed_urls_file: Path
-    last_session_marker: Path
 
 
 @dataclass(frozen=True)
@@ -115,7 +113,6 @@ def download_workspace_paths(
         items_path=Path(str(raw_items_path)),
         archive_file=workdir_path / DOWNLOAD_ARCHIVE_FILENAME,
         failed_urls_file=workdir_path / FAILED_URLS_FILENAME,
-        last_session_marker=workdir_path / LAST_SESSION_FILENAME,
     )
 
 
@@ -241,12 +238,6 @@ def resolve_download_session_pointers(
         source_task_id = stored_ref.source_task_id
         updated_at = stored_ref.updated_at
 
-    if not raw_session_dir and paths.last_session_marker.exists():
-        try:
-            raw_session_dir = paths.last_session_marker.read_text(encoding="utf-8").strip()
-        except Exception:
-            raw_session_dir = ""
-
     if raw_session_dir:
         session_failed_urls_file = Path(raw_session_dir) / FAILED_URLS_FILENAME
         session_ref = _read_download_session_metadata(raw_session_dir)
@@ -279,8 +270,6 @@ def resolve_download_session_pointers(
 def persist_download_session_ref(
     workdir: str | Path,
     ref: DownloadSessionRef,
-    *,
-    keep_legacy_marker: bool = True,
 ) -> DownloadSessionRef:
     paths = download_workspace_paths(workdir)
     from app.agent.session_store import SessionStore
@@ -321,11 +310,6 @@ def persist_download_session_ref(
             }
         )
     session_store.update_recent_result_context(result_context)
-    if keep_legacy_marker and session_ref.session_dir:
-        try:
-            paths.last_session_marker.write_text(session_ref.session_dir, encoding="utf-8")
-        except Exception:
-            pass
     return session_ref
 
 

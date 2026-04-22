@@ -49,7 +49,7 @@ def planner_error_view(code: str) -> dict[str, Any]:
             "error_category": "response_structure",
             "user_title": "模型返回计划结构不完整",
             "user_message": "模型已返回 JSON，但缺少安全执行所需的关键字段。",
-            "user_recovery": "建议重试；如果持续出现，请更换模型，或把需求拆得更明确一些。",
+            "user_recovery": "建议重试；如果持续出现，请更换模型，或把需求写得更明确一些。",
             "user_actions": ["重试", "更换模型", "把请求写得更明确"],
         },
         "planner_unknown_error": {
@@ -158,50 +158,6 @@ class AgentPlanner(Protocol):
         ...
 
 
-class FallbackPlanner(AgentPlanner):
-    planner_name = "llm_with_legacy_fallback"
-
-    def __init__(self, primary: AgentPlanner, fallback: AgentPlanner) -> None:
-        self.primary = primary
-        self.fallback = fallback
-
-    def build_plan(
-        self,
-        user_request: str,
-        workdir: str | Path,
-        defaults: dict[str, Any] | None = None,
-    ) -> PlanDraft:
-        try:
-            draft = self.primary.build_plan(user_request, workdir, defaults)
-            if not draft.planner_name:
-                draft.planner_name = getattr(self.primary, "planner_name", "llm")
-            return draft
-        except Exception as exc:
-            reason = self._fallback_reason(exc)
-            draft = self.fallback.build_plan(user_request, workdir, defaults)
-            draft.planner_name = getattr(self.fallback, "planner_name", "legacy_rule_based")
-            notes = list(draft.planner_notes or [])
-            notes.append(reason)
-            draft.planner_notes = notes
-            return draft
-
-    def _fallback_reason(self, exc: Exception) -> str:
-        if isinstance(exc, PlannerRuntimeError):
-            return (
-                "LLM planner failed with "
-                f"{exc.code}; legacy fallback was used only because "
-                "YTBDLP_AGENT_PLANNER=llm_with_legacy_fallback was explicitly enabled."
-            )
-        return (
-            "LLM planner raised an unexpected error; legacy fallback was used only because "
-            "YTBDLP_AGENT_PLANNER=llm_with_legacy_fallback was explicitly enabled."
-        )
-
-
-LEGACY_PLANNER_MODES = {"legacy", "legacy_rule_based", "rule_based", "regex"}
-EXPLICIT_FALLBACK_PLANNER_MODES = {"llm_with_legacy_fallback", "llm_then_legacy"}
-
-
 def build_planner_from_mode(planner_mode: str) -> AgentPlanner:
     normalized = planner_mode.strip().lower() or "llm"
 
@@ -210,22 +166,9 @@ def build_planner_from_mode(planner_mode: str) -> AgentPlanner:
 
         return LLMPlanner()
 
-    if normalized in LEGACY_PLANNER_MODES:
-        from app.agent.legacy_rule_planner import LegacyRuleBasedPlanner
-
-        return LegacyRuleBasedPlanner()
-
-    if normalized in EXPLICIT_FALLBACK_PLANNER_MODES:
-        from app.agent.legacy_rule_planner import LegacyRuleBasedPlanner
-        from app.agent.llm_planner import LLMPlanner
-
-        return FallbackPlanner(LLMPlanner(), LegacyRuleBasedPlanner())
-
     raise PlannerConfigurationError(
         "Unsupported planner mode: "
-        f"{planner_mode}. Use YTBDLP_AGENT_PLANNER=llm, "
-        "YTBDLP_AGENT_PLANNER=legacy_rule_based, or "
-        "YTBDLP_AGENT_PLANNER=llm_with_legacy_fallback."
+        f"{planner_mode}. Use YTBDLP_AGENT_PLANNER=llm."
     )
 
 

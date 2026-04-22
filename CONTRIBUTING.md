@@ -30,7 +30,7 @@ conda run -n base python -m pip install -U -r requirements-dev.txt
 
 - `run_web.bat` / `run_web.ps1` 是默认本地启动入口
 - `app/web/main.py` + `app/web/static/` 是默认产品壳
-- `gui_app.py` 仅作为 legacy compatibility path，不再作为日常开发主入口
+- `gui_app.py` 仅作为 legacy 桌面兼容壳，不再作为日常开发主入口
 
 前端自动化维持最小 smoke 基线：
 

@@ -31,6 +31,8 @@ class DownloadSessionBoundaryTests(unittest.TestCase):
     def setUp(self) -> None:
         self.workdir = Path("D:/YTBDLP/build/test_download_session_boundary") / uuid.uuid4().hex
         self.workdir.mkdir(parents=True, exist_ok=True)
+        self.download_dir = self.workdir / "downloads"
+        self.download_dir.mkdir(parents=True, exist_ok=True)
         self.addCleanup(shutil.rmtree, self.workdir, True)
 
     def test_session_store_persists_last_download_session_ref(self) -> None:
@@ -48,7 +50,7 @@ class DownloadSessionBoundaryTests(unittest.TestCase):
 
         self.assertEqual(loaded, ref)
 
-    def test_persist_and_resolve_download_session_ref_bridges_legacy_marker(self) -> None:
+    def test_persist_and_resolve_download_session_ref_uses_session_store(self) -> None:
         session_dir = self.workdir / "downloads" / "session-b"
         report_csv = session_dir / "07_download_report.csv"
         failed_urls_file = self.workdir / "06_failed_urls.txt"
@@ -67,15 +69,13 @@ class DownloadSessionBoundaryTests(unittest.TestCase):
         )
 
         resolved = resolve_download_session_pointers(self.workdir)
-        marker = self.workdir / "08_last_download_session.txt"
 
         self.assertEqual(resolved.session_dir, str(session_dir))
         self.assertEqual(resolved.report_csv, str(report_csv))
         self.assertEqual(resolved.failed_urls_file, str(failed_urls_file))
         self.assertEqual(resolved.source_task_id, "task-456")
         self.assertTrue(ref.updated_at)
-        self.assertTrue(marker.exists())
-        self.assertEqual(marker.read_text(encoding="utf-8").strip(), str(session_dir))
+        self.assertEqual(SessionStore(self.workdir).get_last_download_session().session_dir, str(session_dir))
         self.assertTrue((session_dir / SESSION_METADATA_FILENAME).exists())
 
     def test_task_store_extracts_download_session_ref_from_result(self) -> None:
@@ -129,14 +129,18 @@ class DownloadSessionBoundaryTests(unittest.TestCase):
         )
         failed_urls_file.write_text("https://www.youtube.com/watch?v=vid-fail\n", encoding="utf-8")
 
-        snapshot = load_download_results(self.workdir)
+        snapshot = load_download_results(self.workdir, params={"download_dir": self.download_dir})
 
         self.assertTrue(snapshot.available)
         self.assertEqual(snapshot.sessions[0].session_dir, str(session_dir))
         self.assertEqual(snapshot.sessions[0].failed_urls_file, str(failed_urls_file))
         self.assertTrue(snapshot.sessions[0].retry_available)
         self.assertEqual(
-            resolve_retry_failed_urls_file(self.workdir, session_dir),
+            resolve_retry_failed_urls_file(
+                self.workdir,
+                session_dir,
+                params={"download_dir": self.download_dir},
+            ),
             str(failed_urls_file),
         )
 
@@ -186,7 +190,7 @@ class DownloadSessionBoundaryTests(unittest.TestCase):
             )
         )
 
-        snapshot = load_download_results(self.workdir)
+        snapshot = load_download_results(self.workdir, params={"download_dir": self.download_dir})
 
         self.assertEqual(snapshot.sessions[0].source_task_id, task.task_id)
         self.assertEqual(snapshot.sessions[0].source_task_title, task.title)
